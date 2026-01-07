@@ -1,0 +1,9 @@
+# Deployment Artifacts
+
+Release management artifacts created in Phase 7 by the Deployer agent.
+
+## Contents
+- release-notes.md - Release documentation
+- config.md - Deployment configuration
+- deployment-log.md - Deployment history
+- runbook.md - Operations runbook

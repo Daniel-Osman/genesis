@@ -1,0 +1,16 @@
+# Knowledge Base
+
+Research documentation created in Phase 4 by the Researcher agent.
+
+## Structure
+```
+docs/
+├── <library>/
+│   └── <feature>.md
+```
+
+## Rules
+- Official documentation sources ONLY
+- Include version numbers
+- Include official source URLs
+- HALT-006 triggered if non-official source used

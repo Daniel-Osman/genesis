@@ -1,0 +1,52 @@
+{
+  "name": "genesis-framework",
+  "version": "1.0.0",
+  "description": "Production-grade SDLC environment using Agentic Sequential Architecture",
+  "main": "dist/core/orchestrator.js",
+  "types": "dist/core/orchestrator.d.ts",
+  "bin": {
+    "genesis": "dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "typecheck": "tsc --noEmit",
+    "clean": "rimraf dist",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "sdlc",
+    "ai",
+    "agentic",
+    "software-factory",
+    "llm",
+    "automation"
+  ],
+  "author": "Genesis Framework",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "@vitest/coverage-v8": "^1.0.0",
+    "eslint": "^8.55.0",
+    "rimraf": "^5.0.5",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  },
+  "files": [
+    "dist",
+    ".genesis",
+    ".spec",
+    "docs",
+    "README.md"
+  ]
+}
