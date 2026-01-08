@@ -1,0 +1,81 @@
+{
+  "project": {
+    "name": null,
+    "description": null,
+    "created": null,
+    "updated": null,
+    "version": "0.1.0"
+  },
+  "phase": {
+    "current": 0,
+    "status": "NOT_INITIALIZED",
+    "labels": {
+      "0": "Initialization",
+      "1": "Requirements",
+      "2": "Design",
+      "3": "Tasks",
+      "4": "Research",
+      "5": "Implementation",
+      "6": "Validation",
+      "7": "Deployment"
+    }
+  },
+  "session": {
+    "last_active": null,
+    "resume_point": null,
+    "last_action": null
+  },
+  "agent": null,
+  "context": {
+    "prompt_lines": 0,
+    "artifacts_lines": 0,
+    "total_lines": 0,
+    "budget_lines": 2000
+  },
+  "gates": {
+    "gate_1_requirements": "LOCKED",
+    "gate_2_design": "LOCKED",
+    "gate_3_tasks": "LOCKED",
+    "gate_4_research": "LOCKED",
+    "gate_5_implementation": "LOCKED",
+    "gate_6_validation": "LOCKED",
+    "gate_7_deployment": "LOCKED"
+  },
+  "checkpoints": {
+    "pending": false,
+    "type": null,
+    "requested_at": null,
+    "context": null,
+    "validation_passed": false,
+    "history": []
+  },
+  "progress": {
+    "phase_1_complete": false,
+    "phase_2_complete": false,
+    "phase_3_complete": false,
+    "phase_4_complete": false,
+    "phase_5_complete": false,
+    "phase_6_complete": false,
+    "phase_7_complete": false
+  },
+  "halted": false,
+  "halt_reason": null,
+  "halt_code": null,
+  "errors": {
+    "active": [],
+    "count": 0,
+    "fingerprints": {}
+  },
+  "transitions": [],
+  "audit": [],
+  "iteration": {
+    "count": 0,
+    "max": 5,
+    "feedback": null
+  },
+  "config": {
+    "max_retries": 3,
+    "max_iterations": 5,
+    "halt_codes": ["HALT-001", "HALT-002", "HALT-003", "HALT-004", "HALT-005"]
+  }
+}
