@@ -19,7 +19,7 @@ This document defines the governance rules that ensure quality, safety, and corr
 | Scope Definition | Out of scope section populated |
 | Traceability | Matrix initialized |
 
-**Human Approval Required:** Yes
+**Approval:** Auto-approve when criteria met (autonomous mode) or human approval (supervised mode)
 
 ### Gate 2: Design → Tasks
 **Checkpoint:** `CHECKPOINT_DESIGN_COMPLETE`
@@ -34,7 +34,7 @@ This document defines the governance rules that ensure quality, safety, and corr
 | Security | Security considerations addressed |
 | NFR Alignment | Design addresses all NFRs |
 
-**Human Approval Required:** Yes
+**Approval:** Auto-approve when criteria met (autonomous mode) or human approval (supervised mode)
 
 ### Gate 3: Tasks → Research
 **Checkpoint:** `CHECKPOINT_TASKS_COMPLETE`
@@ -48,7 +48,7 @@ This document defines the governance rules that ensure quality, safety, and corr
 | Dependencies | No circular dependencies |
 | Coverage | All design components have tasks |
 
-**Human Approval Required:** Yes
+**Approval:** Auto-approve when criteria met (autonomous mode) or human approval (supervised mode)
 
 ### Gate 4: Research → Implementation
 **Checkpoint:** `CHECKPOINT_RESEARCH_COMPLETE`
@@ -61,7 +61,7 @@ This document defines the governance rules that ensure quality, safety, and corr
 | Version Specified | All docs include library version |
 | No Hallucination | No content from training data |
 
-**Human Approval Required:** Yes
+**Approval:** Auto-approve when criteria met (autonomous mode) or human approval (supervised mode)
 
 ### Gate 5: Implementation → Validation
 **Checkpoint:** `CHECKPOINT_IMPL_COMPLETE`
@@ -74,7 +74,7 @@ This document defines the governance rules that ensure quality, safety, and corr
 | Task Coverage | All tasks marked complete |
 | Doc Reference | Code follows research docs |
 
-**Human Approval Required:** Yes
+**Approval:** Auto-approve when criteria met (autonomous mode) or human approval (supervised mode)
 
 ### Gate 6: Validation → Deployment
 **Checkpoint:** `CHECKPOINT_VALIDATION_COMPLETE`
@@ -88,7 +88,7 @@ This document defines the governance rules that ensure quality, safety, and corr
 | Performance | Meets NFR-1 criteria |
 | Acceptance | All FR acceptance criteria verified |
 
-**Human Approval Required:** Yes
+**Approval:** Auto-approve when criteria met (autonomous mode) or human approval (supervised mode)
 
 ---
 
@@ -225,22 +225,49 @@ IF any answer is NO → ASK for clarification
 
 ---
 
-## 5. Human-in-the-Loop Checkpoints
+## 5. Checkpoints (Autonomous & Supervised Modes)
 
-### 5.1 Mandatory Checkpoints
-| Checkpoint | Phase Transition | Approval Required |
-|------------|------------------|-------------------|
-| PROJECT_INIT | 0 → 1 | Yes |
-| REQ_COMPLETE | 1 → 2 | Yes |
-| DESIGN_COMPLETE | 2 → 3 | Yes |
-| TASKS_COMPLETE | 3 → 4 | Yes |
-| RESEARCH_COMPLETE | 4 → 5 | Yes |
-| IMPL_COMPLETE | 5 → 6 | Yes |
-| VALIDATION_COMPLETE | 6 → 7 | Yes |
-| DEPLOY_READY | 7 → Done | Yes |
+### 5.1 Checkpoint Modes
+| Mode | Behavior | Config Setting |
+|------|----------|----------------|
+| Autonomous | Auto-approve when all criteria pass | `autonomous_mode: true` |
+| Supervised | Require human approval | `require_human_approval: true` |
 
-### 5.2 Checkpoint Protocol
+### 5.2 Mandatory Checkpoints
+| Checkpoint | Phase Transition | Autonomous | Supervised |
+|------------|------------------|------------|------------|
+| PROJECT_INIT | 0 → 1 | Auto if prompts valid | Human approval |
+| REQ_COMPLETE | 1 → 2 | Auto if gate passes | Human approval |
+| DESIGN_COMPLETE | 2 → 3 | Auto if gate passes | Human approval |
+| TASKS_COMPLETE | 3 → 4 | Auto if gate passes | Human approval |
+| RESEARCH_COMPLETE | 4 → 5 | Auto if gate passes | Human approval |
+| IMPL_COMPLETE | 5 → 6 | Auto if gate passes | Human approval |
+| VALIDATION_COMPLETE | 6 → 7 | Auto if gate passes | Human approval |
+| DEPLOY_READY | 7 → Done | Auto if gate passes | Human approval |
+
+### 5.3 Autonomous Checkpoint Protocol
 ```yaml
+When config.autonomous_mode = true:
+
+1. Agent completes phase work
+2. GENESIS: VALIDATE runs automatically
+3. If validation passes:
+   a. Log: "Validation PASSED - Auto-approving"
+   b. Set checkpoint.approved_by = "autonomous"
+   c. Increment metrics.autonomous.auto_approvals
+   d. Execute GENESIS: ADVANCE
+4. If validation fails:
+   a. Attempt self-correction (max 3 times)
+   b. If corrected: Re-validate
+   c. If not corrected:
+      - Critical failure → HALT
+      - Non-critical → Log warning, proceed
+```
+
+### 5.4 Supervised Checkpoint Protocol
+```yaml
+When config.require_human_approval = true:
+
 1. Agent completes phase work
 2. GENESIS: VALIDATE runs
 3. If validation passes:
@@ -260,7 +287,7 @@ IF any answer is NO → ASK for clarification
    c. Re-submit for checkpoint
 ```
 
-### 5.3 Approval Responses
+### 5.5 Approval Responses (Supervised Mode)
 | Response | Action |
 |----------|--------|
 | `APPROVE` | Advance to next phase |
@@ -268,7 +295,7 @@ IF any answer is NO → ASK for clarification
 | `DEFER` | Pause, await later review |
 | `ABORT` | Halt system, require restart |
 
-### 5.4 Iteration Protocol (Within Phase)
+### 5.6 Iteration Protocol (Within Phase)
 For minor adjustments without full rejection:
 
 ```yaml
@@ -283,11 +310,12 @@ GENESIS: ITERATE <feedback>
 
 If iteration_count >= max_iterations:
   - Warn: "Maximum iterations reached"
-  - Suggest: Use REJECT for major changes
+  - In autonomous mode: Proceed with best effort
+  - In supervised mode: Suggest REJECT for major changes
   - Or: GENESIS: CHECKPOINT to formalize progress
 ```
 
-### 5.5 Partial Checkpoints
+### 5.7 Partial Checkpoints
 For long phases (4-Research, 5-Implementation):
 
 ```yaml
@@ -308,7 +336,7 @@ Benefits:
 - Reduces risk of losing progress
 ```
 
-### 5.6 Checkpoint Expiration
+### 5.8 Checkpoint Expiration
 ```yaml
 Checkpoints expire based on type (configurable in status.json):
 
@@ -335,7 +363,7 @@ On expiration:
   4. Then GENESIS: CHECKPOINT for new approval
 ```
 
-### 5.7 Iteration vs. Rejection Decision Guide
+### 5.9 Iteration vs. Rejection Decision Guide
 ```yaml
 Use GENESIS: ITERATE when:
   ✅ Fixing typos, formatting, naming
@@ -565,7 +593,7 @@ BEFORE any phase work begins:
 1. Read status.json
 2. Get active agent: agents.active
 3. Get prompt path: agents.registry[active].prompt
-4. EXECUTE read_file(prompt_path) - THIS IS MANDATORY
+4. EXECUTE read_file(prompt_path) 
 5. Parse loaded prompt for:
    - ## Agent Identity section
    - ## Activation Condition section

@@ -203,7 +203,14 @@
       "deployer": { "tasks_completed": 0, "avg_iteration_count": 0, "rejection_rate": 0 }
     },
     "failure_patterns": [],
-    "bottlenecks": []
+    "bottlenecks": [],
+    "autonomous": {
+      "self_corrections": 0,
+      "auto_approvals": 0,
+      "halts_recovered": 0,
+      "halts_escalated": 0,
+      "phases_completed_autonomously": 0
+    }
   },
   "context": {
     "max_lines_per_artifact": 500,
@@ -247,6 +254,9 @@
     }
   },
   "config": {
+    "autonomous_mode": true,
+    "auto_approve_on_validation_pass": true,
+    "max_self_corrections": 3,
     "max_retries": 3,
     "max_iterations": 5,
     "checkpoint_expiry_hours": 72,
@@ -261,13 +271,13 @@
       "DEPLOY_COMPLETE": 24
     },
     "session_stale_hours": 48,
-    "require_human_approval": true,
+    "require_human_approval": false,
     "strict_mode": true,
     "allow_partial_checkpoints": true,
     "require_agent_sync": true,
     "validate_prompt_hash_on_sync": true,
     "research_fallback_enabled": true,
-    "research_fallback_requires_approval": true,
+    "research_fallback_requires_approval": false,
     "research_cache_enabled": true,
     "validate_prompts_on_init": true,
     "parallel_execution_enabled": false,

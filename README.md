@@ -9,7 +9,12 @@ A production-grade SDLC environment that transforms a blank session into a fully
 
 ## Overview
 
-Genesis is a deterministic, AI-assisted software development framework that guides projects through 7 sequential phases with human-in-the-loop checkpoints. Each phase is managed by a specialized AI agent with strict grounding rules to prevent hallucination.
+Genesis is a deterministic, AI-powered software development framework that guides projects through 7 sequential phases. It supports two operating modes:
+
+- **Autonomous Mode** (default): AI self-approves checkpoints when quality gates pass, enabling fully automated project delivery
+- **Supervised Mode**: Human approval required at each checkpoint for maximum oversight
+
+Each phase is managed by a specialized AI agent with strict grounding rules to prevent hallucination.
 
 ## Installation
 
@@ -29,14 +34,28 @@ npm run build
 
 ## Quick Start
 
-### CLI Usage
+### Autonomous Mode (Default)
+
+```bash
+# Initialize - AI builds entire project autonomously
+genesis init "My SaaS App"
+
+# Check progress anytime
+genesis status
+genesis metrics
+```
+
+The AI will autonomously:
+1. Create requirements → validate → auto-approve → advance
+2. Create design → validate → auto-approve → advance
+3. Continue through all 7 phases
+4. Deliver complete, working application
+
+### Supervised Mode
 
 ```bash
 # Initialize a new project
 genesis init "My SaaS App"
-
-# Check current status
-genesis status
 
 # Approve the initialization checkpoint
 genesis approve
@@ -46,6 +65,9 @@ genesis validate
 
 # Request checkpoint for phase completion
 genesis checkpoint
+
+# Approve to advance
+genesis approve
 
 # View metrics dashboard
 genesis metrics
@@ -67,8 +89,8 @@ GENESIS: METRICS
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                         GENESIS ORCHESTRATOR                                 │
-│                    (State Manager + Agent Router)                           │
+│                    GENESIS AUTONOMOUS ORCHESTRATOR                           │
+│              (State Manager + Agent Router + Self-Supervisor)                │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
         ┌───────────────────────────┼───────────────────────────┐
@@ -300,8 +322,11 @@ Genesis/
 ### Hallucination Prevention
 Each agent has strict grounding rules - outputs must trace to inputs. The Researcher agent (Phase 4) can only use official documentation sources, with tiered confidence scoring.
 
-### Human-in-the-Loop
-Every phase transition requires explicit human approval via checkpoints. No autonomous advancement.
+### Autonomous Self-Approval
+In autonomous mode, the AI validates its own work against quality gates and auto-approves when all criteria pass. Self-correction (up to 3 attempts) handles minor issues automatically.
+
+### Human-in-the-Loop (Supervised Mode)
+When `require_human_approval: true`, every phase transition requires explicit human approval via checkpoints.
 
 ### Error Fingerprinting
 Errors are tracked with fingerprints. Same error 3 times triggers HALT-003, preventing infinite loops.
@@ -382,11 +407,14 @@ Key settings in `.genesis/status.json` → `config`:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
+| `autonomous_mode` | true | Enable fully autonomous operation |
+| `auto_approve_on_validation_pass` | true | Auto-approve when criteria met |
+| `max_self_corrections` | 3 | Self-correction attempts before halt |
 | `max_retries` | 3 | Max error retries before HALT-003 |
 | `max_iterations` | 5 | Max iterations per phase |
 | `checkpoint_expiry_hours` | 72 | Hours before checkpoint expires |
 | `session_stale_hours` | 48 | Hours before stale session warning |
-| `require_human_approval` | true | Require approval at checkpoints |
+| `require_human_approval` | false | Require human approval (supervised mode) |
 | `research_fallback_enabled` | true | Allow fallback research sources |
 | `soft_gate_policy` | warn_and_continue | Soft gate violation handling |
 

@@ -16,6 +16,13 @@ npm install
 npm run build
 ```
 
+## Operating Modes
+
+| Mode | Description | Config |
+|------|-------------|--------|
+| **Autonomous** | AI self-approves when criteria pass | `autonomous_mode: true` |
+| **Supervised** | Human approval required at checkpoints | `require_human_approval: true` |
+
 ## CLI Commands
 
 ```bash
@@ -23,10 +30,10 @@ npm run build
 genesis status                    # Show current state
 genesis init "My App"             # Start new project
 genesis validate                  # Check phase completion
-genesis checkpoint                # Request approval
+genesis checkpoint                # Request approval (supervised mode)
 genesis advance                   # Go to next phase
 
-# Approval commands
+# Approval commands (supervised mode)
 genesis approve                   # Approve pending checkpoint
 genesis reject "feedback"         # Reject with feedback
 
@@ -104,6 +111,25 @@ genesis cache clear               # Clear research cache
 
 ## Quick Start Workflow
 
+### Autonomous Mode (Default)
+```bash
+# 1. Initialize project - auto-approves if valid
+genesis init "My App"
+
+# 2. AI autonomously:
+#    - Creates requirements.md
+#    - Validates → Auto-approves → Advances
+#    - Creates design.md
+#    - Validates → Auto-approves → Advances
+#    - ... continues through all 7 phases
+#    - Delivers complete application
+
+# 3. Check progress anytime
+genesis status
+genesis metrics
+```
+
+### Supervised Mode
 ```bash
 # 1. Initialize project
 genesis init "My App"
@@ -159,11 +185,14 @@ Key settings in `.genesis/status.json` → `config`:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
+| `autonomous_mode` | true | Enable fully autonomous operation |
+| `auto_approve_on_validation_pass` | true | Auto-approve when criteria met |
+| `max_self_corrections` | 3 | Self-correction attempts before halt |
 | `max_retries` | 3 | Max error retries before HALT-003 |
 | `max_iterations` | 5 | Max iterations per phase |
 | `checkpoint_expiry_hours` | 72 | Hours before approval expires |
 | `session_stale_hours` | 48 | Hours before stale warning |
-| `require_human_approval` | true | Require approval at checkpoints |
+| `require_human_approval` | false | Require human approval (supervised mode) |
 | `research_fallback_enabled` | true | Allow non-official doc sources |
 | `soft_gate_policy` | warn_and_continue | How to handle soft gate violations |
 
