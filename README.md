@@ -1,152 +1,87 @@
 # Genesis SaaS Factory
 
-A production-grade SDLC framework that works hand-in-hand with AI-powered code editors to build complete SaaS applications through a structured 7-phase workflow.
+A prompt-based SDLC framework designed for AI-powered code editors. Genesis provides **structure, orchestration, and guardrails** through a supervised 7-phase workflow where humans maintain final decision authority.
 
-[![CI/CD](https://github.com/genesis-framework/genesis/actions/workflows/ci.yml/badge.svg)](https://github.com/genesis-framework/genesis/actions)
-[![npm version](https://badge.fury.io/js/genesis-framework.svg)](https://www.npmjs.com/package/genesis-framework)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue.svg)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Overview
 
-Genesis provides **structure, orchestration, and guardrails** that turn AI-assisted coding into production-ready SaaS. It operates in **supervised mode** where humans maintain final decision authority at every phase transition.
+Genesis works hand-in-hand with AI-powered code editors (like Kiro, Cursor, Claude Dev) to build production-ready SaaS applications. It operates in **supervised mode** where the AI follows structured prompts and humans approve all phase transitions.
 
 ### Key Principles
 
 - **Human Supervision**: Every phase transition requires explicit human approval
-- **Minimal Context**: Load agent context only when needed
+- **Prompt-Driven**: AI follows structured prompts, no code execution required
 - **Clear Audit Trail**: All decisions logged with timestamps and justifications
 - **Structured Workflow**: 7 sequential phases with quality gates
 
 ## Installation
 
+Simply copy the Genesis framework into your project:
+
 ```bash
-# Install globally
-npm install -g genesis-framework
-
-# Or use npx
-npx genesis-framework status
-
-# Or clone and build locally
+# Clone the framework
 git clone https://github.com/genesis-framework/genesis.git
 cd genesis
-npm install
-npm run build
+
+# Copy to your project
+cp -r .genesis /path/to/your/project/
+cp -r .spec /path/to/your/project/
+mkdir -p /path/to/your/project/{docs,src,.deploy}
 ```
 
 ## Quick Start
 
-```bash
-# 1. Initialize project (awaits approval)
-genesis init "My SaaS App"
-
-# 2. Approve to begin Phase 1
-genesis approve
-
-# 3. Work on requirements, then validate
-genesis validate
-
-# 4. Request checkpoint when ready
-genesis checkpoint
-
-# 5. Approve to advance to Phase 2
-genesis approve
-
-# 6. Repeat for each phase until deployment
-```
+1. **Initialize**: Tell your AI editor to read `.genesis/system.md`
+2. **Begin**: AI will guide you through the 7-phase workflow
+3. **Supervise**: Approve each phase transition when ready
+4. **Deploy**: Complete SaaS application ready for production
 
 ## The 7 Phases
 
-| Phase | Agent | Output | Gate |
-|-------|-------|--------|------|
-| 1 | Product Owner | .spec/requirements.md | Requirements defined |
-| 2 | Architect | .spec/design.md | Architecture complete |
-| 3 | Tech Lead | .spec/tasks.md | Tasks breakdown ready |
-| 4 | Researcher | docs/* | Documentation gathered |
-| 5 | Developer | src/* | Code implemented |
-| 6 | Validator | .spec/validation.md | Tests pass |
-| 7 | Deployer | .deploy/* | Deployment ready |
+| Phase | Agent | Output | Human Approval Required |
+|-------|-------|--------|------------------------|
+| 1 | Product Owner | .spec/requirements.md | ✅ |
+| 2 | Architect | .spec/design.md | ✅ |
+| 3 | Tech Lead | .spec/tasks.md | ✅ |
+| 4 | Researcher | docs/* | ✅ |
+| 5 | Developer | src/* | ✅ |
+| 6 | Validator | .spec/validation.md | ✅ |
+| 7 | Deployer | .deploy/* | ✅ |
 
-## Commands
+## How It Works
 
-### Core Workflow
-```bash
-genesis status              # Show current state
-genesis init "name"         # Initialize project
-genesis validate            # Check phase completion
-genesis checkpoint          # Request approval
-genesis iterate "feedback"  # Refine current phase
-```
+### For AI Editors
 
-### Human Control
-```bash
-genesis approve             # Approve → advance phase
-genesis reject "feedback"   # Reject → revisions needed
-genesis skip "reason"       # Force advance (logged)
-genesis undo                # Return to previous phase
-```
+The AI reads `.genesis/system.md` which contains:
+- Complete workflow instructions
+- Phase-by-phase guidance
+- Quality gates and validation criteria
+- Context management rules
 
-### System Control
-```bash
-genesis halt HALT-001 "reason"    # Stop system
-genesis resume "justification"    # Resume from halt
-genesis rollback 3                # Return to Phase 3
-```
+### For Humans
 
-## In-Chat Commands (IDE Integration)
-
-```
-GENESIS: STATUS
-GENESIS: INIT "Project Name"
-GENESIS: VALIDATE
-GENESIS: CHECKPOINT
-APPROVE
-REJECT "feedback"
-SKIP "reason"
-UNDO
-```
-
-## Workflow Diagram
-
-```
-INIT → [Human Approves] → Phase 1 → VALIDATE → CHECKPOINT → [Human Approves] → Phase 2 → ...
-```
-
-Every arrow marked `[Human Approves]` requires explicit human action.
-
-## Halt Codes
-
-| Code | Meaning | Resolution |
-|------|---------|------------|
-| HALT-001 | Validation failed | Fix failures, re-validate |
-| HALT-002 | Phase skip attempted | Use proper workflow |
-| HALT-003 | Same error 3x | Human must investigate |
-| HALT-004 | Required artifact missing | Create the artifact |
-| HALT-005 | Security issue | Human must review |
-
-## Programmatic Usage
-
-```typescript
-import { GenesisOrchestrator } from 'genesis-framework';
-
-const orchestrator = new GenesisOrchestrator('./my-project');
-
-// Execute commands
-await orchestrator.execute({ type: 'STATUS' });
-await orchestrator.execute({ type: 'INIT', name: 'My App' });
-await orchestrator.execute({ type: 'APPROVE' });
-await orchestrator.execute({ type: 'VALIDATE' });
-await orchestrator.execute({ type: 'CHECKPOINT' });
-```
+You maintain control by:
+- Approving phase transitions
+- Providing feedback and iterations
+- Overriding decisions when needed
+- Monitoring the audit trail
 
 ## File Structure
 
 ```
 .genesis/
-  status.json          # State machine (single source of truth)
-  system.md            # Orchestrator prompt
+  status.json          # State machine (AI reads/writes this)
+  system.md            # Main orchestrator prompt for AI
   quickstart.md        # Command reference
-  prompts/             # Agent prompts (loaded on demand)
+  prompts/             # Agent prompts for each phase
+    product_owner.md   # Phase 1: Requirements
+    architect.md       # Phase 2: Design  
+    tech_lead.md       # Phase 3: Tasks
+    researcher.md      # Phase 4: Research
+    developer.md       # Phase 5: Implementation
+    validator.md       # Phase 6: Validation
+    deployer.md        # Phase 7: Deployment
 .spec/
   requirements.md      # Phase 1 output
   design.md            # Phase 2 output
@@ -157,14 +92,67 @@ src/                   # Phase 5 output (code)
 .deploy/               # Phase 7 output (deployment)
 ```
 
+## Status Schema
+
+The AI manages state through `.genesis/status.json`:
+
+```json
+{
+  "project": { "name": "My App", "phase": 1 },
+  "phase": { "current": 1, "status": "IN_PROGRESS" },
+  "checkpoints": { "pending": false },
+  "progress": { "phase_1_complete": false },
+  "audit": []
+}
+```
+
+## Human Commands
+
+Communicate with your AI using these phrases:
+
+```
+GENESIS: STATUS                    # Show current state
+GENESIS: INIT "Project Name"       # Initialize project
+GENESIS: VALIDATE                  # Check phase completion
+GENESIS: CHECKPOINT               # Request approval
+APPROVE                           # Approve → advance phase
+REJECT "feedback"                 # Reject → revisions needed
+SKIP "reason"                     # Force advance (logged)
+UNDO                             # Return to previous phase
+```
+
+## Workflow Example
+
+```
+Human: "GENESIS: INIT 'TaskFlow SaaS'"
+AI: Creates project, loads Product Owner agent, awaits approval
+Human: "APPROVE"
+AI: Advances to Phase 2, loads Architect agent
+Human: "GENESIS: VALIDATE"
+AI: Checks design.md exists and meets criteria
+Human: "GENESIS: CHECKPOINT"
+AI: Requests approval for Phase 2 → Phase 3 transition
+```
+
 ## Configuration
 
 Key settings in `.genesis/status.json`:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `max_retries` | 3 | Error retries before HALT-003 |
+| `max_retries` | 3 | Error retries before halt |
 | `max_iterations` | 5 | Refinements per phase |
+| `context.budget_lines` | 2000 | Context budget for AI |
+
+## Halt Codes
+
+| Code | Meaning | Resolution |
+|------|---------|------------|
+| HALT-001 | Validation failed | Fix failures, re-validate |
+| HALT-002 | Phase skip attempted | Use proper workflow |
+| HALT-003 | Same error 3x | Human must investigate |
+| HALT-004 | Required artifact missing | Create the artifact |
+| HALT-005 | Security issue | Human must review |
 
 ## License
 
