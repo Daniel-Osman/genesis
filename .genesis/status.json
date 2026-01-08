@@ -1,59 +1,14 @@
 {
   "project": {
-    "name": "My App",
+    "name": null,
     "description": null,
-    "created": "2026-01-08T19:30:57.598Z",
-    "updated": "2026-01-08T19:33:37.062Z",
+    "created": null,
+    "updated": null,
     "version": "0.1.0"
   },
-  "prompts": {
-    "version": "1.0.0",
-    "schema_version": "1.0",
-    "versions": {
-      "product_owner": {
-        "version": "1.0.0",
-        "updated": null,
-        "checksum": null
-      },
-      "architect": {
-        "version": "1.0.0",
-        "updated": null,
-        "checksum": null
-      },
-      "tech_lead": {
-        "version": "1.0.0",
-        "updated": null,
-        "checksum": null
-      },
-      "researcher": {
-        "version": "1.0.0",
-        "updated": null,
-        "checksum": null
-      },
-      "developer": {
-        "version": "1.0.0",
-        "updated": null,
-        "checksum": null
-      },
-      "validator": {
-        "version": "1.0.0",
-        "updated": null,
-        "checksum": null
-      },
-      "deployer": {
-        "version": "1.0.0",
-        "updated": null,
-        "checksum": null
-      }
-    },
-    "compatibility": {
-      "min_version": "1.0.0",
-      "migration_available": false
-    }
-  },
   "phase": {
-    "current": 1,
-    "status": "IN_PROGRESS",
+    "current": 0,
+    "status": "NOT_INITIALIZED",
     "labels": {
       "0": "Initialization",
       "1": "Requirements",
@@ -66,152 +21,42 @@
     }
   },
   "session": {
-    "last_active": "2026-01-08T19:33:37.062Z",
-    "stale_threshold_hours": 48,
+    "last_active": null,
     "resume_point": null,
-    "last_action": "Initialized project: My App",
-    "last_artifact_modified": null
+    "last_action": null
   },
-  "agents": {
-    "active": "product_owner",
-    "sync": {
-      "status": "SYNCED",
-      "last_synced": "2026-01-08T19:33:37.062Z",
-      "prompt_loaded": ".genesis/prompts/product_owner.md",
-      "prompt_hash": "50d6a9466a9c8acb",
-      "identity_verified": true
-    },
-    "registry": {
-      "orchestrator": {
-        "prompt": ".genesis/system.md",
-        "phase": "all",
-        "active": true,
-        "prompt_hash": null
-      },
-      "product_owner": {
-        "prompt": ".genesis/prompts/product_owner.md",
-        "phase": 1,
-        "active": true,
-        "prompt_hash": "50d6a9466a9c8acb"
-      },
-      "architect": {
-        "prompt": ".genesis/prompts/architect.md",
-        "phase": 2,
-        "active": false,
-        "prompt_hash": null
-      },
-      "tech_lead": {
-        "prompt": ".genesis/prompts/tech_lead.md",
-        "phase": 3,
-        "active": false,
-        "prompt_hash": null
-      },
-      "researcher": {
-        "prompt": ".genesis/prompts/researcher.md",
-        "phase": 4,
-        "active": false,
-        "prompt_hash": null
-      },
-      "developer": {
-        "prompt": ".genesis/prompts/developer.md",
-        "phase": 5,
-        "active": false,
-        "prompt_hash": null
-      },
-      "validator": {
-        "prompt": ".genesis/prompts/validator.md",
-        "phase": 6,
-        "active": false,
-        "prompt_hash": null
-      },
-      "deployer": {
-        "prompt": ".genesis/prompts/deployer.md",
-        "phase": 7,
-        "active": false,
-        "prompt_hash": null
-      }
-    }
+  "agent": null,
+  "context": {
+    "prompt_lines": 0,
+    "artifacts_lines": 0,
+    "total_lines": 0,
+    "budget_lines": 2000
   },
   "gates": {
-    "gate_1_requirements": "IN_PROGRESS",
+    "gate_1_requirements": "LOCKED",
     "gate_2_design": "LOCKED",
     "gate_3_tasks": "LOCKED",
     "gate_4_research": "LOCKED",
     "gate_5_implementation": "LOCKED",
     "gate_6_validation": "LOCKED",
-    "gate_7_deployment": "LOCKED",
-    "gate_0_init": "PASSED"
-  },
-  "soft_gates": {
-    "enabled": true,
-    "violations": [],
-    "policy": "warn_and_continue",
-    "rules": {
-      "documentation_completeness": {
-        "severity": "soft",
-        "threshold": 80
-      },
-      "test_coverage_minimum": {
-        "severity": "soft",
-        "threshold": 70
-      },
-      "code_comment_ratio": {
-        "severity": "soft",
-        "threshold": 10
-      },
-      "naming_conventions": {
-        "severity": "soft",
-        "threshold": 90
-      },
-      "unused_dependencies": {
-        "severity": "soft",
-        "threshold": 0
-      }
-    }
+    "gate_7_deployment": "LOCKED"
   },
   "checkpoints": {
     "pending": false,
     "type": null,
     "requested_at": null,
-    "expires_at": null,
     "context": null,
-    "partial": false,
-    "partial_progress": null,
-    "history": [
-      {
-        "type": "PROJECT_INIT",
-        "requested_at": "2026-01-08T19:30:57.602Z",
-        "resolved_at": "2026-01-08T19:33:37.055Z",
-        "response": "APPROVE"
-      }
-    ]
-  },
-  "iteration": {
-    "active": false,
-    "feedback": null,
-    "iteration_count": 0,
-    "max_iterations": 5
+    "validation_passed": false,
+    "history": []
   },
   "progress": {
-    "phase_1_requirements_drafted": false,
-    "phase_1_requirements_validated": false,
-    "phase_2_components_designed": [],
-    "phase_2_components_total": 0,
-    "phase_3_tasks_created": [],
-    "phase_3_tasks_total": 0,
-    "phase_4_docs_completed": [],
-    "phase_4_docs_total": 0,
-    "phase_5_tasks_completed": [],
-    "phase_5_tasks_total": 0,
-    "phase_6_tests_passed": [],
-    "phase_6_tests_total": 0,
-    "phase_7_deployment_steps": [],
-    "phase_7_deployment_total": 0
-  },
-  "collaboration": {
-    "mode": "single",
-    "assignees": {},
-    "current_user": null
+    "phase_1_complete": false,
+    "phase_2_complete": false,
+    "phase_3_complete": false,
+    "phase_4_complete": false,
+    "phase_5_complete": false,
+    "phase_6_complete": false,
+    "phase_7_complete": false
   },
   "halted": false,
   "halt_reason": null,
@@ -219,226 +64,18 @@
   "errors": {
     "active": [],
     "count": 0,
-    "fingerprints": {},
-    "patterns": {
-      "tracked": [],
-      "root_causes": {}
-    }
+    "fingerprints": {}
   },
-  "transitions": [
-    {
-      "timestamp": "2026-01-08T19:33:37.059Z",
-      "from_phase": 0,
-      "to_phase": 1,
-      "trigger": "ADVANCE",
-      "agent": "orchestrator",
-      "artifacts_modified": []
-    }
-  ],
-  "metrics": {
-    "phases_completed": 0,
-    "checkpoints_approved": 1,
-    "checkpoints_rejected": 0,
-    "iterations_total": 0,
-    "partial_checkpoints": 0,
-    "errors_total": 0,
-    "errors_resolved": 0,
-    "rollbacks": 0,
-    "phase_timing": {
-      "phase_1": {
-        "started": "2026-01-08T19:33:37.060Z",
-        "completed": null,
-        "duration_hours": null
-      },
-      "phase_2": {
-        "started": null,
-        "completed": null,
-        "duration_hours": null
-      },
-      "phase_3": {
-        "started": null,
-        "completed": null,
-        "duration_hours": null
-      },
-      "phase_4": {
-        "started": null,
-        "completed": null,
-        "duration_hours": null
-      },
-      "phase_5": {
-        "started": null,
-        "completed": null,
-        "duration_hours": null
-      },
-      "phase_6": {
-        "started": null,
-        "completed": null,
-        "duration_hours": null
-      },
-      "phase_7": {
-        "started": null,
-        "completed": null,
-        "duration_hours": null
-      }
-    },
-    "agent_performance": {
-      "product_owner": {
-        "tasks_completed": 0,
-        "avg_iteration_count": 0,
-        "rejection_rate": 0
-      },
-      "architect": {
-        "tasks_completed": 0,
-        "avg_iteration_count": 0,
-        "rejection_rate": 0
-      },
-      "tech_lead": {
-        "tasks_completed": 0,
-        "avg_iteration_count": 0,
-        "rejection_rate": 0
-      },
-      "researcher": {
-        "tasks_completed": 0,
-        "avg_iteration_count": 0,
-        "rejection_rate": 0,
-        "cache_hit_rate": 0
-      },
-      "developer": {
-        "tasks_completed": 0,
-        "avg_iteration_count": 0,
-        "rejection_rate": 0
-      },
-      "validator": {
-        "tasks_completed": 0,
-        "avg_iteration_count": 0,
-        "rejection_rate": 0
-      },
-      "deployer": {
-        "tasks_completed": 0,
-        "avg_iteration_count": 0,
-        "rejection_rate": 0
-      }
-    },
-    "failure_patterns": [],
-    "bottlenecks": [],
-    "autonomous": {
-      "self_corrections": 0,
-      "auto_approvals": 0,
-      "halts_recovered": 0,
-      "halts_escalated": 0,
-      "phases_completed_autonomously": 0
-    }
-  },
-  "context": {
-    "max_lines_per_artifact": 500,
-    "chunking_enabled": true,
-    "current_chunk": null,
-    "total_chunks": null,
-    "chunk_boundaries": "semantic"
-  },
-  "research_cache": {
-    "enabled": true,
-    "ttl_hours": 168,
-    "cache_path": "docs/_cache/",
-    "entries": {},
-    "integrity": {
-      "last_verified": null,
-      "status": "unknown",
-      "corrupted_entries": [],
-      "auto_repair": true
-    }
-  },
-  "research_sources": {
-    "tiers": {
-      "tier_1_official": {
-        "confidence": 100,
-        "auto_approve": true
-      },
-      "tier_2_github": {
-        "confidence": 85,
-        "auto_approve": true
-      },
-      "tier_3_registry": {
-        "confidence": 70,
-        "auto_approve": false
-      },
-      "tier_4_community": {
-        "confidence": 50,
-        "auto_approve": false
-      },
-      "tier_5_fallback": {
-        "confidence": 30,
-        "auto_approve": false
-      }
-    },
-    "minimum_confidence": 50,
-    "usage_log": []
-  },
-  "rollback": {
-    "last_rollback": null,
-    "archive_path": ".genesis/archive/",
-    "rollback_count": 0,
-    "verification": {
-      "last_verified": null,
-      "status": "unknown",
-      "archive_integrity": {},
-      "dry_run_available": true
-    }
+  "transitions": [],
+  "audit": [],
+  "iteration": {
+    "count": 0,
+    "max": 5,
+    "feedback": null
   },
   "config": {
-    "autonomous_mode": true,
-    "auto_approve_on_validation_pass": true,
-    "max_self_corrections": 3,
     "max_retries": 3,
     "max_iterations": 5,
-    "checkpoint_expiry_hours": 72,
-    "checkpoint_expiry_by_type": {
-      "PROJECT_INIT": 24,
-      "REQ_COMPLETE": 72,
-      "DESIGN_COMPLETE": 72,
-      "TASKS_COMPLETE": 48,
-      "RESEARCH_COMPLETE": 48,
-      "IMPL_COMPLETE": 96,
-      "VALIDATION_COMPLETE": 48,
-      "DEPLOY_COMPLETE": 24
-    },
-    "session_stale_hours": 48,
-    "require_human_approval": false,
-    "strict_mode": true,
-    "allow_partial_checkpoints": true,
-    "require_agent_sync": true,
-    "validate_prompt_hash_on_sync": true,
-    "research_fallback_enabled": true,
-    "research_fallback_requires_approval": false,
-    "research_cache_enabled": true,
-    "validate_prompts_on_init": true,
-    "parallel_execution_enabled": false,
-    "max_parallel_tasks": 3,
-    "halt_codes": [
-      "HALT-001",
-      "HALT-002",
-      "HALT-003",
-      "HALT-004",
-      "HALT-005",
-      "HALT-006",
-      "HALT-007",
-      "HALT-008",
-      "HALT-009",
-      "HALT-010",
-      "HALT-011",
-      "HALT-012",
-      "HALT-013"
-    ],
-    "soft_gate_policy": "warn_and_continue",
-    "tiered_research_enabled": true,
-    "prompt_versioning_enabled": true,
-    "rollback_verification_enabled": true,
-    "observability_enabled": true,
-    "error_retry_by_severity": {
-      "CRITICAL": 1,
-      "ERROR": 3,
-      "WARNING": 5,
-      "INFO": 10
-    }
+    "halt_codes": ["HALT-001", "HALT-002", "HALT-003", "HALT-004", "HALT-005"]
   }
 }

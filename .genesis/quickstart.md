@@ -3,211 +3,154 @@
 ## Installation
 
 ```bash
-# Install globally
 npm install -g genesis-framework
-
-# Or use npx
-npx genesis-framework status
-
-# Or clone and build locally
-git clone https://github.com/genesis-framework/genesis.git
-cd genesis
-npm install
-npm run build
+# Or: npx genesis-framework status
 ```
 
-## Operating Modes
+---
 
-| Mode | Description | Config |
-|------|-------------|--------|
-| **Autonomous** | AI self-approves when criteria pass | `autonomous_mode: true` |
-| **Supervised** | Human approval required at checkpoints | `require_human_approval: true` |
+## Operating Model: Supervised
+
+All phase transitions require human approval.
+
+```
+AI → Creates artifacts → Validates → Requests checkpoint
+Human → Reviews → APPROVE / REJECT / SKIP
+```
+
+---
 
 ## CLI Commands
 
+### Core Workflow
 ```bash
-# Core commands
-genesis status                    # Show current state
-genesis init "My App"             # Start new project
-genesis validate                  # Check phase completion
-genesis checkpoint                # Request approval (supervised mode)
-genesis advance                   # Go to next phase
-
-# Approval commands (supervised mode)
-genesis approve                   # Approve pending checkpoint
-genesis reject "feedback"         # Reject with feedback
-
-# Control commands
-genesis iterate "feedback"        # Refine without rejection
-genesis halt HALT-001 "reason"    # Stop system
-genesis resume                    # Continue after halt
-genesis rollback 3                # Go back to phase 3
-genesis rollback 3 --dry-run      # Simulate rollback
-
-# Observability commands
-genesis metrics                   # Show performance dashboard
-genesis metrics export json       # Export metrics (json/csv/md)
-genesis soft-gates                # Show soft gate violations
-genesis cache status              # Show research cache
-genesis cache clear               # Clear research cache
+genesis status              # Show current state
+genesis init "name"         # Initialize project
+genesis validate            # Check phase completion
+genesis checkpoint          # Request approval
+genesis iterate "feedback"  # Refine current phase
 ```
 
-## In-Chat Commands (IDE/LLM Integration)
+### Human Control
+```bash
+genesis approve             # Approve → advance phase
+genesis reject "feedback"   # Reject → revisions needed
+genesis skip "reason"       # Force advance (logged)
+genesis undo                # Return to previous phase
+genesis force "action" "reason"     # Log forced action
+genesis override gate_1_requirements "reason"  # Override gate
+```
 
-| Command | What it does |
-|---------|--------------|
+### System Control
+```bash
+genesis halt HALT-001 "reason"    # Stop system
+genesis resume "justification"    # Resume from halt
+genesis rollback 3                # Return to Phase 3
+```
+
+### Context Management
+```bash
+genesis load-agent 1              # Load Phase 1 agent
+genesis load-artifact .spec/requirements.md  # Load artifact
+genesis context-status            # Show context budget
+genesis reset-context             # Clear loaded context
+```
+
+### Audit Trail
+```bash
+genesis history                   # Show full audit history
+```
+
+---
+
+## In-Chat Commands
+
+| Command | Action |
+|---------|--------|
 | `GENESIS: STATUS` | Show current state |
 | `GENESIS: INIT "name"` | Start new project |
 | `GENESIS: VALIDATE` | Check phase completion |
 | `GENESIS: CHECKPOINT` | Request approval |
-| `GENESIS: CHECKPOINT PARTIAL` | Save partial progress |
-| `GENESIS: ADVANCE` | Go to next phase |
-| `GENESIS: ITERATE <feedback>` | Refine without rejection |
-| `GENESIS: HALT <code>` | Stop system |
-| `GENESIS: RESUME` | Continue after halt |
-| `GENESIS: ROLLBACK <phase>` | Go back to phase |
-| `GENESIS: ROLLBACK <phase> --dry-run` | Simulate rollback |
-| `GENESIS: METRICS` | Show performance dashboard |
-| `GENESIS: SOFT-GATES` | Show soft gate violations |
+| `APPROVE` | Approve checkpoint |
+| `REJECT "feedback"` | Reject checkpoint |
+| `SKIP "reason"` | Force advance |
+| `UNDO` | Previous phase |
+| `GENESIS: HISTORY` | Show audit trail |
+
+---
 
 ## Phases
 
+| # | Phase | Agent | Output |
+|---|-------|-------|--------|
+| 1 | Requirements | Product Owner | .spec/requirements.md |
+| 2 | Design | Architect | .spec/design.md |
+| 3 | Tasks | Tech Lead | .spec/tasks.md |
+| 4 | Research | Researcher | docs/* |
+| 5 | Implementation | Developer | src/* |
+| 6 | Validation | Validator | .spec/validation.md |
+| 7 | Deployment | Deployer | .deploy/* |
+
+---
+
+## Context Budget
+
+Genesis tracks context usage to keep prompts efficient:
+
 ```
-1. Requirements  →  Product Owner  →  .spec/requirements.md
-2. Design        →  Architect      →  .spec/design.md
-3. Tasks         →  Tech Lead      →  .spec/tasks.md
-4. Research      →  Researcher     →  docs/*
-5. Implementation→  Developer      →  src/*
-6. Validation    →  Validator      →  .spec/validation.md
-7. Deployment    →  Deployer       →  .deploy/*
+CONTEXT BUDGET:
+  Prompt Lines: 50
+  Artifact Lines: 200
+  Total Used: 250 / 2000 lines
+  Remaining: 1750 lines
 ```
 
-## Approval Responses
+Use `genesis reset-context` to clear and start fresh.
 
-| Say | Effect |
-|-----|--------|
-| `APPROVE` | Move forward |
-| `REJECT <reason>` | Fix and retry |
-| `DEFER` | Pause for later |
-| `ABORT` | Full stop |
+---
 
 ## Halt Codes
 
 | Code | Meaning |
 |------|---------|
 | HALT-001 | Validation failed |
-| HALT-002 | Tried to skip phase |
+| HALT-002 | Phase skip attempted |
 | HALT-003 | Same error 3x |
-| HALT-004 | Missing file |
-| HALT-005 | Circular dependency |
-| HALT-006 | Used unofficial source |
-| HALT-007 | Approval rejected |
-| HALT-008 | Tests failed |
-| HALT-009 | Security issue |
-| HALT-010 | Agent prompt not loaded |
-| HALT-011 | Rollback failed |
-| HALT-012 | Cache integrity failure |
-| HALT-013 | Rollback verification failed |
+| HALT-004 | Required artifact missing |
+| HALT-005 | Security issue |
 
-## Quick Start Workflow
+---
 
-### Autonomous Mode (Default)
+## Workflow Example
+
 ```bash
-# 1. Initialize project - auto-approves if valid
-genesis init "My App"
-
-# 2. AI autonomously:
-#    - Creates requirements.md
-#    - Validates → Auto-approves → Advances
-#    - Creates design.md
-#    - Validates → Auto-approves → Advances
-#    - ... continues through all 7 phases
-#    - Delivers complete application
-
-# 3. Check progress anytime
-genesis status
-genesis metrics
-```
-
-### Supervised Mode
-```bash
-# 1. Initialize project
-genesis init "My App"
-
-# 2. Approve initialization
+# 1. Initialize
+genesis init "Todo App"
 genesis approve
 
-# 3. Work through phases
-#    - Agent works on current phase
-#    - Validate when ready
+# 2. Work on Phase 1
+genesis load-agent 1
+# ... create requirements.md ...
 genesis validate
-
-# 4. Request checkpoint
 genesis checkpoint
-
-# 5. Approve to advance
 genesis approve
 
-# 6. Repeat for each phase until deployment
+# 3. Continue through phases
+# ... repeat for each phase ...
 ```
 
-## Programmatic Usage
-
-```typescript
-import { GenesisOrchestrator } from 'genesis-framework';
-
-const orchestrator = new GenesisOrchestrator('./my-project');
-
-// Execute commands
-await orchestrator.execute({ type: 'STATUS' });
-await orchestrator.execute({ type: 'INIT', name: 'My App' });
-await orchestrator.execute({ type: 'APPROVE' });
-await orchestrator.execute({ type: 'VALIDATE' });
-await orchestrator.execute({ type: 'CHECKPOINT' });
-```
-
-## Tips
-
-- **Stuck?** → `genesis status` to see where you are
-- **Want changes?** → `genesis iterate "change X to Y"`
-- **Long phase?** → `GENESIS: CHECKPOINT PARTIAL` to save progress
-- **Made a mistake?** → `genesis rollback <phase>`
-- **Session ended?** → System auto-resumes from last point
-- **Distributed team?** → Increase `checkpoint_expiry_hours` in status.json
-- **Research blocked?** → Enable `research_fallback_enabled` for alternatives
-- **Check performance?** → `genesis metrics` for timing and bottlenecks
-- **Non-critical warnings?** → `genesis soft-gates` to review
-- **Test rollback?** → `genesis rollback <phase> --dry-run` first
-
-## Configuration
-
-Key settings in `.genesis/status.json` → `config`:
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `autonomous_mode` | true | Enable fully autonomous operation |
-| `auto_approve_on_validation_pass` | true | Auto-approve when criteria met |
-| `max_self_corrections` | 3 | Self-correction attempts before halt |
-| `max_retries` | 3 | Max error retries before HALT-003 |
-| `max_iterations` | 5 | Max iterations per phase |
-| `checkpoint_expiry_hours` | 72 | Hours before approval expires |
-| `session_stale_hours` | 48 | Hours before stale warning |
-| `require_human_approval` | false | Require human approval (supervised mode) |
-| `research_fallback_enabled` | true | Allow non-official doc sources |
-| `soft_gate_policy` | warn_and_continue | How to handle soft gate violations |
-
-See `governance.md` Section 12 for full configuration reference.
+---
 
 ## File Locations
 
 | What | Where |
 |------|-------|
-| State | `.genesis/status.json` |
-| Errors | `.genesis/error.md` |
-| Requirements | `.spec/requirements.md` |
-| Design | `.spec/design.md` |
-| Tasks | `.spec/tasks.md` |
-| Research | `docs/<lib>/<feature>.md` |
-| Code | `src/*` |
-| Tests | `.spec/validation.md` |
-| Deploy | `.deploy/*` |
+| State | .genesis/status.json |
+| Agent Prompts | .genesis/prompts/*.md |
+| Requirements | .spec/requirements.md |
+| Design | .spec/design.md |
+| Tasks | .spec/tasks.md |
+| Research | docs/* |
+| Code | src/* |
+| Validation | .spec/validation.md |
+| Deployment | .deploy/* |

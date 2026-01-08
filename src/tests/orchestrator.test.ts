@@ -1,67 +1,85 @@
 /**
  * Genesis Framework - Orchestrator Tests
- * Comprehensive test suite for the core orchestrator
- * @version 1.0.0
+ * Phases A-D: Complete test coverage
+ * @version 2.0.0
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { GenesisOrchestrator } from '../core/orchestrator';
-import type { GenesisStatus } from '../core/types';
-
-const TEST_WORKSPACE = path.join(__dirname, '../../.test-workspace');
 
 describe('GenesisOrchestrator', () => {
+  const testWorkspace = path.join(process.cwd(), 'test-workspace');
   let orchestrator: GenesisOrchestrator;
 
   beforeEach(async () => {
     // Create test workspace
-    await fs.mkdir(TEST_WORKSPACE, { recursive: true });
-    await fs.mkdir(path.join(TEST_WORKSPACE, '.genesis'), { recursive: true });
-    await fs.mkdir(path.join(TEST_WORKSPACE, '.genesis/prompts'), { recursive: true });
-    await fs.mkdir(path.join(TEST_WORKSPACE, '.spec'), { recursive: true });
-    await fs.mkdir(path.join(TEST_WORKSPACE, 'docs/_cache'), { recursive: true });
-    await fs.mkdir(path.join(TEST_WORKSPACE, 'src'), { recursive: true });
-    await fs.mkdir(path.join(TEST_WORKSPACE, '.deploy'), { recursive: true });
+    await fs.mkdir(testWorkspace, { recursive: true });
+    await fs.mkdir(path.join(testWorkspace, '.genesis'), { recursive: true });
+    await fs.mkdir(path.join(testWorkspace, '.genesis', 'prompts'), { recursive: true });
+    await fs.mkdir(path.join(testWorkspace, '.spec'), { recursive: true });
+    await fs.mkdir(path.join(testWorkspace, 'docs'), { recursive: true });
+    await fs.mkdir(path.join(testWorkspace, 'src'), { recursive: true });
+    await fs.mkdir(path.join(testWorkspace, '.deploy'), { recursive: true });
 
-    // Copy status.json template
-    const statusTemplate = await fs.readFile(
-      path.join(__dirname, '../../.genesis/status.json'),
-      'utf-8'
-    );
+    // Create default status.json
+    const defaultStatus = {
+      project: { name: null, description: null, created: null, updated: null, version: '0.1.0' },
+      phase: {
+        current: 0,
+        status: 'NOT_INITIALIZED',
+        labels: {
+          '0': 'Initialization', '1': 'Requirements', '2': 'Design', '3': 'Tasks',
+          '4': 'Research', '5': 'Implementation', '6': 'Validation', '7': 'Deployment'
+        }
+      },
+      session: { last_active: null, resume_point: null, last_action: null },
+      agent: null,
+      context: { prompt_lines: 0, artifacts_lines: 0, total_lines: 0, budget_lines: 2000 },
+      gates: {
+        gate_1_requirements: 'LOCKED', gate_2_design: 'LOCKED', gate_3_tasks: 'LOCKED',
+        gate_4_research: 'LOCKED', gate_5_implementation: 'LOCKED',
+        gate_6_validation: 'LOCKED', gate_7_deployment: 'LOCKED'
+      },
+      checkpoints: { pending: false, type: null, requested_at: null, context: null, validation_passed: false, history: [] },
+      progress: {
+        phase_1_complete: false, phase_2_complete: false, phase_3_complete: false,
+        phase_4_complete: false, phase_5_complete: false, phase_6_complete: false, phase_7_complete: false
+      },
+      halted: false, halt_reason: null, halt_code: null,
+      errors: { active: [], count: 0, fingerprints: {} },
+      transitions: [],
+      audit: [],
+      iteration: { count: 0, max: 5, feedback: null },
+      config: { max_retries: 3, max_iterations: 5, halt_codes: ['HALT-001', 'HALT-002', 'HALT-003', 'HALT-004', 'HALT-005'] }
+    };
+
     await fs.writeFile(
-      path.join(TEST_WORKSPACE, '.genesis/status.json'),
-      statusTemplate
+      path.join(testWorkspace, '.genesis', 'status.json'),
+      JSON.stringify(defaultStatus, null, 2)
     );
 
-    // Create minimal agent prompts
-    const agents = ['product_owner', 'architect', 'tech_lead', 'researcher', 'developer', 'validator', 'deployer'];
-    for (const agent of agents) {
-      await fs.writeFile(
-        path.join(TEST_WORKSPACE, `.genesis/prompts/${agent}.md`),
-        `# ${agent} Agent\n\n## Agent Identity\nTest agent\n\n## Activation Condition\n\`\`\`json\n{}\n\`\`\`\n\n## Responsibilities\nTest\n\n## Workflow\nTest`
-      );
-    }
-
-    // Create system.md
+    // Create a mock agent prompt
     await fs.writeFile(
-      path.join(TEST_WORKSPACE, '.genesis/system.md'),
-      '# System\n\n## Agent Identity\nOrchestrator\n\n## Activation Condition\n```json\n{}\n```\n\n## Responsibilities\nTest\n\n## Workflow\nTest'
+      path.join(testWorkspace, '.genesis', 'prompts', 'product_owner.md'),
+      '# Product Owner\n\nAgent prompt for Phase 1.\n\n## Role\nGather requirements.'
     );
 
-    orchestrator = new GenesisOrchestrator(TEST_WORKSPACE);
+    orchestrator = new GenesisOrchestrator(testWorkspace);
   });
 
   afterEach(async () => {
-    // Cleanup test workspace
-    await fs.rm(TEST_WORKSPACE, { recursive: true, force: true });
+    await fs.rm(testWorkspace, { recursive: true, force: true });
   });
+
+  // ==========================================================================
+  // Phase A: Core Workflow Tests
+  // ==========================================================================
 
   describe('STATUS command', () => {
     it('should return current status', async () => {
       const result = await orchestrator.execute({ type: 'STATUS' });
-      
       expect(result.success).toBe(true);
       expect(result.message).toContain('GENESIS STATUS');
       expect(result.message).toContain('Not initialized');
@@ -69,13 +87,12 @@ describe('GenesisOrchestrator', () => {
   });
 
   describe('INIT command', () => {
-    it('should initialize a new project', async () => {
+    it('should initialize a new project and await approval', async () => {
       const result = await orchestrator.execute({ type: 'INIT', name: 'Test Project' });
-      
       expect(result.success).toBe(true);
       expect(result.message).toContain('Test Project');
-      expect(result.checkpoint?.type).toBe('PROJECT_INIT');
-      expect(result.checkpoint?.awaiting_approval).toBe(true);
+      expect(result.message).toContain('AWAITING APPROVAL');
+      expect(result.awaiting_approval).toBe(true);
     });
 
     it('should reject initialization if already initialized', async () => {
@@ -83,7 +100,6 @@ describe('GenesisOrchestrator', () => {
       await orchestrator.execute({ type: 'APPROVE' });
       
       const result = await orchestrator.execute({ type: 'INIT', name: 'Another Project' });
-      
       expect(result.success).toBe(false);
       expect(result.message).toContain('already initialized');
     });
@@ -93,34 +109,41 @@ describe('GenesisOrchestrator', () => {
     it('should validate current phase', async () => {
       await orchestrator.execute({ type: 'INIT', name: 'Test Project' });
       await orchestrator.execute({ type: 'APPROVE' });
-      
+
       const result = await orchestrator.execute({ type: 'VALIDATE' });
-      
       expect(result.success).toBeDefined();
-      expect(result.message).toContain('VALIDATION RESULTS');
+      expect(result.message).toContain('VALIDATION');
+    });
+
+    it('should fail validation when requirements.md is missing', async () => {
+      await orchestrator.execute({ type: 'INIT', name: 'Test Project' });
+      await orchestrator.execute({ type: 'APPROVE' });
+
+      const result = await orchestrator.execute({ type: 'VALIDATE' });
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('requirements.md');
     });
   });
 
   describe('CHECKPOINT command', () => {
-    it('should request checkpoint after validation', async () => {
+    it('should request checkpoint after initialization', async () => {
       await orchestrator.execute({ type: 'INIT', name: 'Test Project' });
       await orchestrator.execute({ type: 'APPROVE' });
-      
-      // Checkpoint will fail validation since requirements aren't complete
-      // This is expected behavior - validation must pass first
+
       const result = await orchestrator.execute({ type: 'CHECKPOINT' });
-      
-      // Should mention validation failed or checkpoint
-      expect(result.message).toMatch(/checkpoint|validation/i);
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('CHECKPOINT REQUESTED');
+      expect(result.awaiting_approval).toBe(true);
     });
 
-    it('should support partial checkpoints', async () => {
+    it('should not allow duplicate checkpoints', async () => {
       await orchestrator.execute({ type: 'INIT', name: 'Test Project' });
       await orchestrator.execute({ type: 'APPROVE' });
-      
-      const result = await orchestrator.execute({ type: 'CHECKPOINT', partial: true });
-      
-      expect(result.message).toContain('Partial');
+      await orchestrator.execute({ type: 'CHECKPOINT' });
+
+      const result = await orchestrator.execute({ type: 'CHECKPOINT' });
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('already pending');
     });
   });
 
@@ -128,36 +151,37 @@ describe('GenesisOrchestrator', () => {
     it('should halt the system', async () => {
       await orchestrator.execute({ type: 'INIT', name: 'Test Project' });
       await orchestrator.execute({ type: 'APPROVE' });
-      
+
       const result = await orchestrator.execute({ 
         type: 'HALT', 
         code: 'HALT-001', 
         reason: 'Test halt' 
       });
-      
+
       expect(result.success).toBe(true);
-      expect(result.message).toContain('SYSTEM HALTED');
-      expect(result.halt?.code).toBe('HALT-001');
+      expect(result.message).toContain('HALTED');
     });
 
     it('should block commands when halted', async () => {
       await orchestrator.execute({ type: 'INIT', name: 'Test Project' });
       await orchestrator.execute({ type: 'APPROVE' });
-      await orchestrator.execute({ type: 'HALT', code: 'HALT-001', reason: 'Test' });
-      
+      await orchestrator.execute({ type: 'HALT', code: 'HALT-001', reason: 'Test halt' });
+
       const result = await orchestrator.execute({ type: 'VALIDATE' });
-      
       expect(result.success).toBe(false);
       expect(result.message).toContain('halted');
     });
 
-    it('should resume from halt', async () => {
+    it('should resume from halt with justification', async () => {
       await orchestrator.execute({ type: 'INIT', name: 'Test Project' });
       await orchestrator.execute({ type: 'APPROVE' });
-      await orchestrator.execute({ type: 'HALT', code: 'HALT-001', reason: 'Test' });
-      
-      const result = await orchestrator.execute({ type: 'RESUME' });
-      
+      await orchestrator.execute({ type: 'HALT', code: 'HALT-001', reason: 'Test halt' });
+
+      const result = await orchestrator.execute({ 
+        type: 'RESUME', 
+        justification: 'Issue resolved' 
+      });
+
       expect(result.success).toBe(true);
       expect(result.message).toContain('RESUMED');
     });
@@ -167,37 +191,36 @@ describe('GenesisOrchestrator', () => {
     it('should apply iteration feedback', async () => {
       await orchestrator.execute({ type: 'INIT', name: 'Test Project' });
       await orchestrator.execute({ type: 'APPROVE' });
-      
+
       const result = await orchestrator.execute({ 
         type: 'ITERATE', 
-        feedback: 'Add more detail to requirements' 
+        feedback: 'Add more detail' 
       });
-      
+
       expect(result.success).toBe(true);
-      expect(result.message).toContain('Iteration 1');
+      expect(result.message).toContain('Iteration');
     });
 
     it('should track iteration count', async () => {
       await orchestrator.execute({ type: 'INIT', name: 'Test Project' });
       await orchestrator.execute({ type: 'APPROVE' });
-      
+
       await orchestrator.execute({ type: 'ITERATE', feedback: 'First' });
-      await orchestrator.execute({ type: 'ITERATE', feedback: 'Second' });
-      const result = await orchestrator.execute({ type: 'ITERATE', feedback: 'Third' });
-      
-      expect(result.message).toContain('Iteration 3');
+      const result = await orchestrator.execute({ type: 'ITERATE', feedback: 'Second' });
+
+      expect(result.message).toContain('2/5');
     });
   });
 
-  describe('APPROVE/REJECT commands', () => {
-    it('should approve pending checkpoint', async () => {
+  describe('APPROVE/REJECT/SKIP commands', () => {
+    it('should approve pending checkpoint and advance', async () => {
       await orchestrator.execute({ type: 'INIT', name: 'Test Project' });
       
       const result = await orchestrator.execute({ type: 'APPROVE' });
-      
+
       expect(result.success).toBe(true);
-      // After approval, it advances to next phase
-      expect(result.message).toMatch(/APPROVED|ADVANCED/i);
+      expect(result.message).toContain('APPROVED');
+      expect(result.message).toContain('Phase 1');
     });
 
     it('should reject pending checkpoint with feedback', async () => {
@@ -207,85 +230,205 @@ describe('GenesisOrchestrator', () => {
         type: 'REJECT', 
         feedback: 'Need more detail' 
       });
-      
+
       expect(result.success).toBe(true);
       expect(result.message).toContain('REJECTED');
-      expect(result.message).toContain('Need more detail');
     });
 
-    it('should fail if no pending checkpoint', async () => {
+    it('should skip with reason and advance', async () => {
       await orchestrator.execute({ type: 'INIT', name: 'Test Project' });
       await orchestrator.execute({ type: 'APPROVE' });
-      
-      const result = await orchestrator.execute({ type: 'APPROVE' });
-      
-      expect(result.success).toBe(false);
-      expect(result.message).toContain('No pending checkpoint');
+      await orchestrator.execute({ type: 'CHECKPOINT' });
+
+      const result = await orchestrator.execute({ 
+        type: 'SKIP', 
+        reason: 'MVP scope' 
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('SKIPPED');
+    });
+  });
+
+  describe('UNDO command', () => {
+    it('should return to previous phase', async () => {
+      await orchestrator.execute({ type: 'INIT', name: 'Test Project' });
+      await orchestrator.execute({ type: 'APPROVE' });
+      await orchestrator.execute({ type: 'CHECKPOINT' });
+      await orchestrator.execute({ type: 'APPROVE' });
+
+      const result = await orchestrator.execute({ type: 'UNDO' });
+
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('UNDO');
     });
   });
 
   describe('ROLLBACK command', () => {
-    it('should perform dry-run rollback', async () => {
+    it('should rollback to earlier phase', async () => {
       await orchestrator.execute({ type: 'INIT', name: 'Test Project' });
       await orchestrator.execute({ type: 'APPROVE' });
-      
-      // Advance a few phases first (would need proper setup)
-      const result = await orchestrator.execute({ 
-        type: 'ROLLBACK', 
-        phase: 1, 
-        dryRun: true 
-      });
-      
-      // Should fail since we're at phase 1
-      expect(result.message).toBeDefined();
+      await orchestrator.execute({ type: 'CHECKPOINT' });
+      await orchestrator.execute({ type: 'APPROVE' });
+      await orchestrator.execute({ type: 'CHECKPOINT' });
+      await orchestrator.execute({ type: 'APPROVE' });
+
+      const result = await orchestrator.execute({ type: 'ROLLBACK', phase: 1 });
+
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('ROLLBACK');
     });
 
     it('should reject forward rollback', async () => {
       await orchestrator.execute({ type: 'INIT', name: 'Test Project' });
       await orchestrator.execute({ type: 'APPROVE' });
-      
-      const result = await orchestrator.execute({ type: 'ROLLBACK', phase: 5 });
-      
+
+      const result = await orchestrator.execute({ type: 'ROLLBACK', phase: 3 });
+
       expect(result.success).toBe(false);
       expect(result.message).toContain('Cannot rollback forward');
     });
   });
 
-  describe('METRICS command', () => {
-    it('should display metrics dashboard', async () => {
+  // ==========================================================================
+  // Phase B: Context Optimization Tests
+  // ==========================================================================
+
+  describe('LOAD_AGENT command', () => {
+    it('should load agent context for phase', async () => {
       await orchestrator.execute({ type: 'INIT', name: 'Test Project' });
       await orchestrator.execute({ type: 'APPROVE' });
-      
-      const result = await orchestrator.execute({ type: 'METRICS' });
-      
+
+      const result = await orchestrator.execute({ type: 'LOAD_AGENT', phase: 1 });
+
       expect(result.success).toBe(true);
-      expect(result.message).toContain('METRICS DASHBOARD');
+      expect(result.message).toContain('product_owner');
+      expect(result.message).toContain('CONTEXT BUDGET');
     });
   });
 
-  describe('SOFT_GATES command', () => {
-    it('should display soft gate status', async () => {
+  describe('LOAD_ARTIFACT command', () => {
+    it('should load artifact into context', async () => {
       await orchestrator.execute({ type: 'INIT', name: 'Test Project' });
       await orchestrator.execute({ type: 'APPROVE' });
-      
-      const result = await orchestrator.execute({ type: 'SOFT_GATES' });
-      
+
+      // Create a test artifact
+      await fs.writeFile(
+        path.join(testWorkspace, '.spec', 'requirements.md'),
+        '# Requirements\n\n## FR-1: Test Feature\n\nAcceptance criteria here.'
+      );
+
+      const result = await orchestrator.execute({ 
+        type: 'LOAD_ARTIFACT', 
+        path: '.spec/requirements.md' 
+      });
+
       expect(result.success).toBe(true);
-      expect(result.message).toContain('SOFT GATE STATUS');
+      expect(result.message).toContain('ARTIFACT LOADED');
+      expect(result.message).toContain('CONTEXT BUDGET');
+    });
+
+    it('should fail for non-existent artifact', async () => {
+      await orchestrator.execute({ type: 'INIT', name: 'Test Project' });
+      await orchestrator.execute({ type: 'APPROVE' });
+
+      const result = await orchestrator.execute({ 
+        type: 'LOAD_ARTIFACT', 
+        path: '.spec/nonexistent.md' 
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('not found');
     });
   });
 
-  describe('CACHE commands', () => {
-    it('should show cache status', async () => {
-      const result = await orchestrator.execute({ type: 'CACHE_STATUS' });
-      
+  describe('CONTEXT_STATUS command', () => {
+    it('should show context budget status', async () => {
+      await orchestrator.execute({ type: 'INIT', name: 'Test Project' });
+      await orchestrator.execute({ type: 'APPROVE' });
+
+      const result = await orchestrator.execute({ type: 'CONTEXT_STATUS' });
+
       expect(result.success).toBe(true);
+      expect(result.message).toContain('CONTEXT STATUS');
+      expect(result.message).toContain('CONTEXT BUDGET');
+    });
+  });
+
+  describe('RESET_CONTEXT command', () => {
+    it('should reset context', async () => {
+      await orchestrator.execute({ type: 'INIT', name: 'Test Project' });
+      await orchestrator.execute({ type: 'APPROVE' });
+      await orchestrator.execute({ type: 'LOAD_AGENT', phase: 1 });
+
+      const result = await orchestrator.execute({ type: 'RESET_CONTEXT' });
+
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('Context reset');
+    });
+  });
+
+  // ==========================================================================
+  // Phase C: Human Control Enhancement Tests
+  // ==========================================================================
+
+  describe('FORCE command', () => {
+    it('should log forced action in audit trail', async () => {
+      await orchestrator.execute({ type: 'INIT', name: 'Test Project' });
+      await orchestrator.execute({ type: 'APPROVE' });
+
+      const result = await orchestrator.execute({ 
+        type: 'FORCE', 
+        action: 'Skip validation', 
+        reason: 'Emergency deployment' 
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('FORCE ACTION LOGGED');
+    });
+  });
+
+  describe('OVERRIDE command', () => {
+    it('should override gate status', async () => {
+      await orchestrator.execute({ type: 'INIT', name: 'Test Project' });
+      await orchestrator.execute({ type: 'APPROVE' });
+
+      const result = await orchestrator.execute({ 
+        type: 'OVERRIDE', 
+        gate: 'gate_1_requirements', 
+        reason: 'Manual verification complete' 
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('GATE OVERRIDE');
     });
 
-    it('should clear cache', async () => {
-      const result = await orchestrator.execute({ type: 'CACHE_CLEAR' });
-      
+    it('should fail for invalid gate', async () => {
+      await orchestrator.execute({ type: 'INIT', name: 'Test Project' });
+      await orchestrator.execute({ type: 'APPROVE' });
+
+      const result = await orchestrator.execute({ 
+        type: 'OVERRIDE', 
+        gate: 'invalid_gate', 
+        reason: 'Test' 
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('Unknown gate');
+    });
+  });
+
+  describe('HISTORY command', () => {
+    it('should show audit history', async () => {
+      await orchestrator.execute({ type: 'INIT', name: 'Test Project' });
+      await orchestrator.execute({ type: 'APPROVE' });
+
+      const result = await orchestrator.execute({ type: 'HISTORY' });
+
       expect(result.success).toBe(true);
+      expect(result.message).toContain('AUDIT HISTORY');
+      expect(result.message).toContain('CHECKPOINT HISTORY');
+      expect(result.message).toContain('PHASE TRANSITIONS');
     });
   });
 });

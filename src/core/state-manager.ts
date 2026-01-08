@@ -1,7 +1,7 @@
 /**
  * Genesis Framework - State Manager
- * Handles all state persistence and atomic updates
- * @version 1.0.0
+ * Foundation Reset: Simplified state management with human-first control
+ * @version 2.0.0
  */
 
 import * as fs from 'fs/promises';
@@ -10,13 +10,14 @@ import { createHash } from 'crypto';
 import type { 
   GenesisStatus, 
   Phase, 
-  AgentName, 
+  AgentName,
+  AgentContext,
   HaltCode,
-  CheckpointType,
   TransitionEntry,
   ErrorEntry,
   GenesisEvent,
-  EventHandler
+  EventHandler,
+  ApprovalResponse
 } from './types';
 
 export class StateManager {
@@ -40,7 +41,9 @@ export class StateManager {
       this.status = JSON.parse(content) as GenesisStatus;
       return this.status;
     } catch (error) {
-      throw new Error(`Failed to load status.json: ${error}`);
+      // Return default state if file doesn't exist
+      this.status = this.getDefaultStatus();
+      return this.status;
     }
   }
 
@@ -49,7 +52,6 @@ export class StateManager {
       throw new Error('No status loaded');
     }
     
-    // Update timestamp
     this.status.session.last_active = new Date().toISOString();
     this.status.project.updated = new Date().toISOString();
     
@@ -62,6 +64,90 @@ export class StateManager {
       throw new Error('Status not loaded. Call load() first.');
     }
     return this.status;
+  }
+
+  private getDefaultStatus(): GenesisStatus {
+    return {
+      project: {
+        name: null,
+        description: null,
+        created: null,
+        updated: null,
+        version: '0.1.0'
+      },
+      phase: {
+        current: 0,
+        status: 'NOT_INITIALIZED',
+        labels: {
+          0: 'Initialization',
+          1: 'Requirements',
+          2: 'Design',
+          3: 'Tasks',
+          4: 'Research',
+          5: 'Implementation',
+          6: 'Validation',
+          7: 'Deployment'
+        }
+      },
+      session: {
+        last_active: null,
+        resume_point: null,
+        last_action: null
+      },
+      agent: null,
+      context: {
+        prompt_lines: 0,
+        artifacts_lines: 0,
+        total_lines: 0,
+        budget_lines: 2000
+      },
+      gates: {
+        gate_1_requirements: 'LOCKED',
+        gate_2_design: 'LOCKED',
+        gate_3_tasks: 'LOCKED',
+        gate_4_research: 'LOCKED',
+        gate_5_implementation: 'LOCKED',
+        gate_6_validation: 'LOCKED',
+        gate_7_deployment: 'LOCKED'
+      },
+      checkpoints: {
+        pending: false,
+        type: null,
+        requested_at: null,
+        context: null,
+        validation_passed: false,
+        history: []
+      },
+      progress: {
+        phase_1_complete: false,
+        phase_2_complete: false,
+        phase_3_complete: false,
+        phase_4_complete: false,
+        phase_5_complete: false,
+        phase_6_complete: false,
+        phase_7_complete: false
+      },
+      halted: false,
+      halt_reason: null,
+      halt_code: null,
+      errors: {
+        active: [],
+        count: 0,
+        fingerprints: {}
+      },
+      transitions: [],
+      audit: [],
+      iteration: {
+        count: 0,
+        max: 5,
+        feedback: null
+      },
+      config: {
+        max_retries: 3,
+        max_iterations: 5,
+        halt_codes: ['HALT-001', 'HALT-002', 'HALT-003', 'HALT-004', 'HALT-005']
+      }
+    };
   }
 
   // ============================================================================
@@ -79,55 +165,141 @@ export class StateManager {
   }
 
   // ============================================================================
-  // Phase Management
+  // Initialization
   // ============================================================================
 
-  async setPhase(phase: Phase, status: GenesisStatus['phase']['status']): Promise<void> {
-    const oldPhase = this.get().phase.current;
-    this.get().phase.current = phase;
-    this.get().phase.status = status;
+  async initialize(projectName: string, description?: string): Promise<void> {
+    const status = this.get();
     
-    if (oldPhase !== phase) {
-      await this.emit({ type: 'PHASE_CHANGED', from: oldPhase, to: phase });
-    }
+    status.project.name = projectName;
+    status.project.description = description || null;
+    status.project.created = new Date().toISOString();
+    status.project.updated = new Date().toISOString();
+    status.project.version = '0.1.0';
+    
+    status.phase.current = 0;
+    status.phase.status = 'AWAITING_APPROVAL';
+    
+    status.session.last_active = new Date().toISOString();
+    status.session.last_action = `Initialized project: ${projectName}`;
+    
+    // Request checkpoint for initialization - human must approve
+    status.checkpoints.pending = true;
+    status.checkpoints.type = 'PROJECT_INIT';
+    status.checkpoints.requested_at = new Date().toISOString();
+    status.checkpoints.context = `Initialize project "${projectName}"`;
+    status.checkpoints.validation_passed = true; // Init is always valid
     
     await this.save();
+    await this.emit({ type: 'INITIALIZED', project: projectName });
+    await this.emit({ type: 'CHECKPOINT_REQUESTED', phase: 0 });
   }
 
+  // ============================================================================
+  // Phase Management - All transitions require human approval
+  // ============================================================================
+
   async advancePhase(): Promise<Phase> {
-    const current = this.get().phase.current;
+    const status = this.get();
+    const current = status.phase.current;
+    
     if (current >= 7) {
       throw new Error('Already at final phase');
     }
     
     const next = (current + 1) as Phase;
-    await this.setPhase(next, 'IN_PROGRESS');
     
-    // Update gate status
-    const gateKey = `gate_${next}_${this.getGateName(next)}`;
-    this.get().gates[gateKey] = 'IN_PROGRESS';
+    // Record transition with human approval
+    const entry: TransitionEntry = {
+      timestamp: new Date().toISOString(),
+      from_phase: current,
+      to_phase: next,
+      trigger: 'APPROVE',
+      approved_by: 'human'
+    };
+    status.transitions.push(entry);
     
-    // Record transition
-    await this.recordTransition(current, next, 'ADVANCE');
+    // Update phase
+    status.phase.current = next;
+    status.phase.status = 'IN_PROGRESS';
     
-    // Update metrics
+    // Update gates
     if (current > 0) {
-      const timingKey = `phase_${current}`;
-      this.get().metrics.phase_timing[timingKey].completed = new Date().toISOString();
+      const currentGate = `gate_${current}_${this.getGateName(current)}`;
+      status.gates[currentGate] = 'PASSED';
       
-      const started = this.get().metrics.phase_timing[timingKey].started;
-      if (started) {
-        const duration = (Date.now() - new Date(started).getTime()) / (1000 * 60 * 60);
-        this.get().metrics.phase_timing[timingKey].duration_hours = Math.round(duration * 10) / 10;
-      }
+      // Mark phase complete
+      const progressKey = `phase_${current}_complete` as keyof typeof status.progress;
+      (status.progress as unknown as Record<string, boolean>)[progressKey] = true;
     }
     
-    // Start timing for new phase
-    const newTimingKey = `phase_${next}`;
-    this.get().metrics.phase_timing[newTimingKey].started = new Date().toISOString();
+    const nextGate = `gate_${next}_${this.getGateName(next)}`;
+    status.gates[nextGate] = 'IN_PROGRESS';
+    
+    // Reset iteration count for new phase
+    status.iteration.count = 0;
+    status.iteration.feedback = null;
+    
+    // Clear checkpoint
+    status.checkpoints.pending = false;
+    status.checkpoints.type = null;
+    status.checkpoints.requested_at = null;
+    status.checkpoints.context = null;
+    status.checkpoints.validation_passed = false;
     
     await this.save();
+    await this.emit({ type: 'PHASE_CHANGED', from: current, to: next, approved_by: 'human' });
+    
     return next;
+  }
+
+  async rollbackPhase(targetPhase: Phase): Promise<void> {
+    const status = this.get();
+    const current = status.phase.current;
+    
+    if (targetPhase >= current) {
+      throw new Error(`Cannot rollback forward. Current: ${current}, Target: ${targetPhase}`);
+    }
+    
+    if (targetPhase < 1) {
+      throw new Error('Cannot rollback to Phase 0. Use INIT to restart.');
+    }
+    
+    // Record transition
+    const entry: TransitionEntry = {
+      timestamp: new Date().toISOString(),
+      from_phase: current,
+      to_phase: targetPhase,
+      trigger: 'UNDO',
+      approved_by: 'human'
+    };
+    status.transitions.push(entry);
+    
+    // Reset gates for phases after target
+    for (let p = targetPhase + 1; p <= 7; p++) {
+      const gate = `gate_${p}_${this.getGateName(p as Phase)}`;
+      status.gates[gate] = 'LOCKED';
+      
+      const progressKey = `phase_${p}_complete` as keyof typeof status.progress;
+      (status.progress as unknown as Record<string, boolean>)[progressKey] = false;
+    }
+    
+    // Set target phase to in progress
+    status.phase.current = targetPhase;
+    status.phase.status = 'IN_PROGRESS';
+    status.gates[`gate_${targetPhase}_${this.getGateName(targetPhase)}`] = 'IN_PROGRESS';
+    
+    // Clear checkpoint
+    status.checkpoints.pending = false;
+    status.checkpoints.type = null;
+    status.checkpoints.validation_passed = false;
+    
+    // Reset iteration
+    status.iteration.count = 0;
+    status.iteration.feedback = null;
+    
+    await this.save();
+    await this.emit({ type: 'PHASE_CHANGED', from: current, to: targetPhase, approved_by: 'human' });
   }
 
   private getGateName(phase: Phase): string {
@@ -145,77 +317,12 @@ export class StateManager {
   }
 
   // ============================================================================
-  // Agent Management
+  // Agent Context Management - Load on demand
   // ============================================================================
 
-  async activateAgent(agent: AgentName): Promise<void> {
-    const status = this.get();
-    
-    // Deactivate current agent
-    if (status.agents.active) {
-      status.agents.registry[status.agents.active].active = false;
-    }
-    
-    // Activate new agent
-    status.agents.active = agent;
-    status.agents.registry[agent].active = true;
-    
-    await this.save();
-  }
-
-  async syncAgent(agent: AgentName): Promise<{ success: boolean; identity: string }> {
-    const status = this.get();
-    const registry = status.agents.registry[agent];
-    
-    if (!registry) {
-      throw new Error(`Unknown agent: ${agent}`);
-    }
-    
-    const promptPath = path.join(this.workspacePath, registry.prompt);
-    
-    try {
-      const content = await fs.readFile(promptPath, 'utf-8');
-      
-      // Verify required sections
-      if (!content.includes('## Agent Identity')) {
-        throw new Error('Missing ## Agent Identity section');
-      }
-      if (!content.includes('## Activation Condition')) {
-        throw new Error('Missing ## Activation Condition section');
-      }
-      
-      // Extract identity
-      const identityMatch = content.match(/## Agent Identity\s*\n([^\n]+)/);
-      const identity = identityMatch ? identityMatch[1].trim() : 'Unknown';
-      
-      // Calculate hash
-      const hash = createHash('sha256').update(content).digest('hex').substring(0, 16);
-      
-      // Update sync status
-      status.agents.sync = {
-        status: 'SYNCED',
-        last_synced: new Date().toISOString(),
-        prompt_loaded: registry.prompt,
-        prompt_hash: hash,
-        identity_verified: true
-      };
-      
-      registry.prompt_hash = hash;
-      
-      await this.save();
-      await this.emit({ type: 'AGENT_SYNCED', agent });
-      
-      return { success: true, identity };
-    } catch (error) {
-      status.agents.sync.status = 'FAILED';
-      await this.save();
-      throw error;
-    }
-  }
-
-  getAgentForPhase(phase: Phase): AgentName {
-    const mapping: Record<Phase, AgentName> = {
-      0: 'orchestrator',
+  getAgentForPhase(phase: Phase): AgentName | null {
+    const mapping: Record<Phase, AgentName | null> = {
+      0: null,
       1: 'product_owner',
       2: 'architect',
       3: 'tech_lead',
@@ -227,29 +334,129 @@ export class StateManager {
     return mapping[phase];
   }
 
-  // ============================================================================
-  // Checkpoint Management
-  // ============================================================================
-
-  async requestCheckpoint(type: CheckpointType, context?: string, partial = false): Promise<void> {
-    const status = this.get();
-    const expiryHours = status.config.checkpoint_expiry_by_type[type] 
-      || status.config.checkpoint_expiry_hours;
+  async loadAgentContext(phase: Phase): Promise<AgentContext | null> {
+    const agentName = this.getAgentForPhase(phase);
+    if (!agentName) return null;
     
-    status.checkpoints.pending = true;
-    status.checkpoints.type = type;
-    status.checkpoints.requested_at = new Date().toISOString();
-    status.checkpoints.expires_at = new Date(Date.now() + expiryHours * 60 * 60 * 1000).toISOString();
-    status.checkpoints.context = context || null;
-    status.checkpoints.partial = partial;
+    const promptPath = `.genesis/prompts/${agentName}.md`;
+    const fullPath = path.join(this.workspacePath, promptPath);
     
-    status.phase.status = 'CHECKPOINT_PENDING';
-    
-    await this.save();
-    await this.emit({ type: 'CHECKPOINT_REQUESTED', checkpointType: type });
+    try {
+      const content = await fs.readFile(fullPath, 'utf-8');
+      const lines = content.split('\n').length;
+      
+      const context: AgentContext = {
+        name: agentName,
+        phase,
+        prompt_path: promptPath,
+        loaded: true,
+        prompt_lines: lines,
+        artifacts_loaded: []
+      };
+      
+      // Update context tracking
+      const status = this.get();
+      status.agent = context;
+      status.context.prompt_lines = lines;
+      status.context.total_lines = lines + status.context.artifacts_lines;
+      
+      await this.save();
+      
+      return context;
+    } catch {
+      return null;
+    }
   }
 
-  async resolveCheckpoint(response: 'APPROVE' | 'REJECT' | 'DEFER', feedback?: string): Promise<void> {
+  async loadArtifact(artifactPath: string): Promise<{ content: string; lines: number } | null> {
+    const fullPath = path.join(this.workspacePath, artifactPath);
+    
+    try {
+      const content = await fs.readFile(fullPath, 'utf-8');
+      const lines = content.split('\n').length;
+      
+      // Update context tracking
+      const status = this.get();
+      if (status.agent && !status.agent.artifacts_loaded.includes(artifactPath)) {
+        status.agent.artifacts_loaded.push(artifactPath);
+        status.context.artifacts_lines += lines;
+        status.context.total_lines = status.context.prompt_lines + status.context.artifacts_lines;
+        await this.save();
+      }
+      
+      return { content, lines };
+    } catch {
+      return null;
+    }
+  }
+
+  getContextBudgetStatus(): { used: number; budget: number; remaining: number; overBudget: boolean } {
+    const status = this.get();
+    const used = status.context.total_lines;
+    const budget = status.context.budget_lines;
+    return {
+      used,
+      budget,
+      remaining: budget - used,
+      overBudget: used > budget
+    };
+  }
+
+  async resetContext(): Promise<void> {
+    const status = this.get();
+    status.agent = null;
+    status.context.prompt_lines = 0;
+    status.context.artifacts_lines = 0;
+    status.context.total_lines = 0;
+    await this.save();
+  }
+
+  // ============================================================================
+  // Audit Trail
+  // ============================================================================
+
+  async logAudit(action: string, reason: string): Promise<void> {
+    const status = this.get();
+    status.audit.push({
+      timestamp: new Date().toISOString(),
+      action,
+      phase: status.phase.current,
+      reason,
+      user: 'human'
+    });
+    await this.save();
+  }
+
+  async overrideGate(gate: string, reason: string): Promise<void> {
+    const status = this.get();
+    
+    if (status.gates[gate]) {
+      status.gates[gate] = 'PASSED';
+      await this.logAudit(`OVERRIDE: ${gate}`, reason);
+      await this.save();
+    }
+  }
+
+  // ============================================================================
+  // Checkpoint Management - Human approval required
+  // ============================================================================
+
+  async requestCheckpoint(validationPassed: boolean): Promise<void> {
+    const status = this.get();
+    
+    status.checkpoints.pending = true;
+    status.checkpoints.type = 'PHASE_COMPLETE';
+    status.checkpoints.requested_at = new Date().toISOString();
+    status.checkpoints.context = `Phase ${status.phase.current} - ${status.phase.labels[status.phase.current]}`;
+    status.checkpoints.validation_passed = validationPassed;
+    
+    status.phase.status = 'PENDING_CHECKPOINT';
+    
+    await this.save();
+    await this.emit({ type: 'CHECKPOINT_REQUESTED', phase: status.phase.current });
+  }
+
+  async resolveCheckpoint(response: ApprovalResponse, feedback?: string): Promise<void> {
     const status = this.get();
     
     if (!status.checkpoints.pending) {
@@ -258,6 +465,7 @@ export class StateManager {
     
     const historyEntry = {
       type: status.checkpoints.type!,
+      phase: status.phase.current,
       requested_at: status.checkpoints.requested_at!,
       resolved_at: new Date().toISOString(),
       response,
@@ -267,32 +475,24 @@ export class StateManager {
     status.checkpoints.history.push(historyEntry);
     
     if (response === 'APPROVE') {
-      status.metrics.checkpoints_approved++;
+      await this.emit({ type: 'CHECKPOINT_APPROVED', phase: status.phase.current });
+    } else if (response === 'REJECT') {
       status.checkpoints.pending = false;
       status.checkpoints.type = null;
-      status.checkpoints.requested_at = null;
-      status.checkpoints.expires_at = null;
-      status.checkpoints.context = null;
-      status.checkpoints.partial = false;
-      status.checkpoints.partial_progress = null;
-      
-      await this.emit({ type: 'CHECKPOINT_APPROVED', checkpointType: historyEntry.type });
-    } else if (response === 'REJECT') {
-      status.metrics.checkpoints_rejected++;
-      status.checkpoints.pending = false;
+      status.checkpoints.validation_passed = false;
       status.phase.status = 'IN_PROGRESS';
       
-      await this.emit({ type: 'CHECKPOINT_REJECTED', checkpointType: historyEntry.type, feedback: feedback || '' });
+      await this.emit({ 
+        type: 'CHECKPOINT_REJECTED', 
+        phase: status.phase.current, 
+        feedback: feedback || '' 
+      });
+    } else if (response === 'SKIP') {
+      // Skip records the justification but advances anyway
+      await this.emit({ type: 'CHECKPOINT_APPROVED', phase: status.phase.current });
     }
-    // DEFER keeps checkpoint pending
     
     await this.save();
-  }
-
-  isCheckpointExpired(): boolean {
-    const status = this.get();
-    if (!status.checkpoints.expires_at) return false;
-    return new Date() > new Date(status.checkpoints.expires_at);
   }
 
   // ============================================================================
@@ -311,20 +511,18 @@ export class StateManager {
     await this.emit({ type: 'HALTED', code, reason });
   }
 
-  async resume(justification?: string): Promise<void> {
+  async resume(justification: string): Promise<void> {
     const status = this.get();
     
     if (!status.halted) {
       throw new Error('System is not halted');
     }
     
-    // If HALT-003, reset fingerprint count
-    if (status.halt_code === 'HALT-003' && justification) {
-      // Find and reset the blocking fingerprint
-      for (const [_fp, data] of Object.entries(status.errors.fingerprints)) {
-        if (data.blocked) {
-          data.count = 0;
-          data.blocked = false;
+    // Reset error fingerprint if HALT-003
+    if (status.halt_code === 'HALT-003') {
+      for (const fp of Object.keys(status.errors.fingerprints)) {
+        if (status.errors.fingerprints[fp].count >= status.config.max_retries) {
+          status.errors.fingerprints[fp].count = 0;
         }
       }
     }
@@ -335,79 +533,50 @@ export class StateManager {
     status.phase.status = 'IN_PROGRESS';
     
     await this.save();
-    await this.emit({ type: 'RESUMED' });
+    await this.emit({ type: 'RESUMED', justification });
   }
 
   // ============================================================================
   // Error Management
   // ============================================================================
 
-  async logError(error: Omit<ErrorEntry, 'id' | 'timestamp' | 'fingerprint' | 'retry_count' | 'status'>): Promise<ErrorEntry> {
+  async logError(error: Omit<ErrorEntry, 'id' | 'timestamp' | 'fingerprint' | 'retry_count'>): Promise<ErrorEntry> {
     const status = this.get();
     
     // Generate fingerprint
     const fingerprint = createHash('md5')
-      .update(`${error.category}:${error.phase}:${error.message}`)
+      .update(`${error.phase}:${error.message}`)
       .digest('hex')
       .substring(0, 12);
     
-    // Check fingerprint registry
+    // Track fingerprint
     if (!status.errors.fingerprints[fingerprint]) {
-      status.errors.fingerprints[fingerprint] = { count: 0, last_seen: '', blocked: false };
+      status.errors.fingerprints[fingerprint] = { count: 0, last_seen: '' };
     }
     
     const fpData = status.errors.fingerprints[fingerprint];
     fpData.count++;
     fpData.last_seen = new Date().toISOString();
     
-    // Check if should block
-    const maxRetries = status.config.error_retry_by_severity[error.severity];
-    if (fpData.count >= maxRetries) {
-      fpData.blocked = true;
-    }
-    
     const entry: ErrorEntry = {
       ...error,
       id: `ERR-${String(status.errors.count + 1).padStart(4, '0')}`,
       timestamp: new Date().toISOString(),
       fingerprint,
-      retry_count: fpData.count,
-      max_retries: maxRetries,
-      resolution: null,
-      status: fpData.blocked ? 'BLOCKED' : 'OPEN'
+      retry_count: fpData.count
     };
     
     status.errors.active.push(entry);
     status.errors.count++;
-    status.metrics.errors_total++;
     
     await this.save();
-    await this.emit({ type: 'ERROR_LOGGED', error: entry });
     
-    // Auto-halt if blocked
-    if (fpData.blocked) {
+    // Auto-halt if same error repeated too many times
+    if (fpData.count >= status.config.max_retries) {
       await this.halt('HALT-003', `Error repeated ${fpData.count} times: ${error.message}`);
     }
     
     return entry;
-  }
-
-  async resolveError(errorId: string, resolution: string): Promise<void> {
-    const status = this.get();
-    const error = status.errors.active.find(e => e.id === errorId);
-    
-    if (!error) {
-      throw new Error(`Error not found: ${errorId}`);
-    }
-    
-    error.status = 'RESOLVED';
-    error.resolution = resolution;
-    status.metrics.errors_resolved++;
-    
-    // Remove from active
-    status.errors.active = status.errors.active.filter(e => e.id !== errorId);
-    
-    await this.save();
   }
 
   // ============================================================================
@@ -417,54 +586,21 @@ export class StateManager {
   async applyIteration(feedback: string): Promise<number> {
     const status = this.get();
     
-    if (status.iteration.iteration_count >= status.iteration.max_iterations) {
-      throw new Error(`Maximum iterations (${status.iteration.max_iterations}) reached`);
+    if (status.iteration.count >= status.iteration.max) {
+      throw new Error(`Maximum iterations (${status.iteration.max}) reached. Request checkpoint or use SKIP.`);
     }
     
-    status.iteration.active = true;
+    status.iteration.count++;
     status.iteration.feedback = feedback;
-    status.iteration.iteration_count++;
-    status.metrics.iterations_total++;
     
     await this.save();
-    await this.emit({ type: 'ITERATION_APPLIED', count: status.iteration.iteration_count });
     
-    return status.iteration.iteration_count;
-  }
-
-  // ============================================================================
-  // Transition Recording
-  // ============================================================================
-
-  private async recordTransition(from: Phase, to: Phase, trigger: string): Promise<void> {
-    const status = this.get();
-    
-    const entry: TransitionEntry = {
-      timestamp: new Date().toISOString(),
-      from_phase: from,
-      to_phase: to,
-      trigger,
-      agent: status.agents.active || 'orchestrator',
-      artifacts_modified: []
-    };
-    
-    status.transitions.push(entry);
-    await this.save();
+    return status.iteration.count;
   }
 
   // ============================================================================
   // Session Management
   // ============================================================================
-
-  isSessionStale(): boolean {
-    const status = this.get();
-    if (!status.session.last_active) return false;
-    
-    const lastActive = new Date(status.session.last_active);
-    const staleThreshold = status.session.stale_threshold_hours * 60 * 60 * 1000;
-    
-    return Date.now() - lastActive.getTime() > staleThreshold;
-  }
 
   async updateSession(action: string, resumePoint?: string): Promise<void> {
     const status = this.get();
@@ -474,38 +610,6 @@ export class StateManager {
     if (resumePoint) {
       status.session.resume_point = resumePoint;
     }
-    
-    await this.save();
-  }
-
-  // ============================================================================
-  // Progress Tracking
-  // ============================================================================
-
-  async updateProgress(_phase: Phase, key: string, value: unknown): Promise<void> {
-    const status = this.get();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (status.progress as any)[key] = value;
-    await this.save();
-  }
-
-  // ============================================================================
-  // Initialization
-  // ============================================================================
-
-  async initialize(projectName: string): Promise<void> {
-    const status = this.get();
-    
-    status.project.name = projectName;
-    status.project.created = new Date().toISOString();
-    status.project.updated = new Date().toISOString();
-    status.project.version = '0.1.0';
-    
-    status.phase.current = 0;
-    status.phase.status = 'AWAITING_HUMAN';
-    
-    status.session.last_active = new Date().toISOString();
-    status.session.last_action = `Initialized project: ${projectName}`;
     
     await this.save();
   }

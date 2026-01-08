@@ -1,36 +1,30 @@
 /**
  * Genesis Framework - Orchestrator Engine
- * Central controller implementing the agentic sequential pipeline
- * @version 1.0.0
+ * Foundation Reset: Supervised-first control model
+ * All phase transitions require human approval
+ * @version 2.0.0
  */
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { StateManager } from './state-manager';
 import { ValidationEngine } from './validator';
-import { RollbackManager } from './rollback';
-import { MetricsCollector } from './metrics';
 import type { 
   GenesisCommand, 
   CommandResult, 
-  Phase, 
-  AgentName,
+  Phase,
   HaltCode
 } from './types';
 
 export class GenesisOrchestrator {
   private stateManager: StateManager;
   private validator: ValidationEngine;
-  private rollbackManager: RollbackManager;
-  private metrics: MetricsCollector;
   private workspacePath: string;
 
   constructor(workspacePath: string) {
     this.workspacePath = workspacePath;
     this.stateManager = new StateManager(workspacePath);
     this.validator = new ValidationEngine(workspacePath);
-    this.rollbackManager = new RollbackManager(workspacePath);
-    this.metrics = new MetricsCollector(workspacePath);
   }
 
   // ============================================================================
@@ -38,75 +32,81 @@ export class GenesisOrchestrator {
   // ============================================================================
 
   async execute(command: GenesisCommand): Promise<CommandResult> {
-    // Load current state
     await this.stateManager.load();
     const status = this.stateManager.get();
 
-    // Check halt status (except for RESUME and STATUS commands)
+    // Check halt status (except for RESUME and STATUS)
     if (status.halted && command.type !== 'RESUME' && command.type !== 'STATUS') {
       return {
         success: false,
-        message: `System halted: ${status.halt_code} - ${status.halt_reason}. Use GENESIS: RESUME to continue.`,
+        message: `⛔ System halted: ${status.halt_code}\n\nReason: ${status.halt_reason}\n\nUse GENESIS: RESUME "justification" to continue.`,
         halt: { code: status.halt_code!, reason: status.halt_reason! }
       };
     }
 
-    // Route command
     switch (command.type) {
       case 'STATUS':
         return this.handleStatus();
       case 'INIT':
-        return this.handleInit(command.name);
+        return this.handleInit(command.name, command.description);
       case 'VALIDATE':
         return this.handleValidate();
       case 'CHECKPOINT':
-        return this.handleCheckpoint(command.partial);
-      case 'ADVANCE':
-        return this.handleAdvance();
+        return this.handleCheckpoint();
       case 'ITERATE':
         return this.handleIterate(command.feedback);
+      case 'APPROVE':
+        return this.handleApprove(command.feedback);
+      case 'REJECT':
+        return this.handleReject(command.feedback);
+      case 'SKIP':
+        return this.handleSkip(command.reason);
+      case 'UNDO':
+        return this.handleUndo();
       case 'HALT':
         return this.handleHalt(command.code, command.reason);
       case 'RESUME':
         return this.handleResume(command.justification);
       case 'ROLLBACK':
-        return this.handleRollback(command.phase, command.dryRun);
-      case 'AGENT':
-        return this.handleAgent(command.name);
-      case 'CHUNK':
-        return this.handleChunk(command.number);
-      case 'CACHE_CLEAR':
-        return this.handleCacheClear(command.library);
-      case 'CACHE_STATUS':
-        return this.handleCacheStatus();
-      case 'METRICS':
-        return this.handleMetrics();
-      case 'METRICS_EXPORT':
-        return this.handleMetricsExport(command.format);
-      case 'SOFT_GATES':
-        return this.handleSoftGates();
-      case 'APPROVE':
-        return this.handleApprove(command.feedback);
-      case 'REJECT':
-        return this.handleReject(command.feedback);
-      case 'DEFER':
-        return this.handleDefer();
-      case 'ABORT':
-        return this.handleAbort();
+        return this.handleRollback(command.phase);
+      case 'LOAD_AGENT':
+        return this.handleLoadAgent(command.phase);
+      case 'LOAD_ARTIFACT':
+        return this.handleLoadArtifact(command.path);
+      case 'CONTEXT_STATUS':
+        return this.handleContextStatus();
+      case 'RESET_CONTEXT':
+        return this.handleResetContext();
+      case 'FORCE':
+        return this.handleForce(command.action, command.reason);
+      case 'OVERRIDE':
+        return this.handleOverride(command.gate, command.reason);
+      case 'HISTORY':
+        return this.handleHistory();
       default:
         return { success: false, message: 'Unknown command' };
     }
   }
 
   // ============================================================================
-  // Command Handlers
+  // Status Handler
   // ============================================================================
 
   private async handleStatus(): Promise<CommandResult> {
     const status = this.stateManager.get();
     const phaseLabel = status.phase.labels[status.phase.current];
-    const agent = status.agents.active || 'none';
     
+    const gateDisplay = Object.entries(status.gates)
+      .map(([k, v]) => {
+        const icon = v === 'PASSED' ? '✅' : v === 'IN_PROGRESS' ? '🔄' : v === 'FAILED' ? '❌' : '🔒';
+        return `  ${icon} ${k}: ${v}`;
+      })
+      .join('\n');
+
+    const progressDisplay = Object.entries(status.progress)
+      .map(([k, v]) => `  ${v ? '✅' : '⚪'} ${k.replace(/_/g, ' ')}`)
+      .join('\n');
+
     let message = `
 ═══════════════════════════════════════════════════════════
                     GENESIS STATUS
@@ -115,136 +115,163 @@ export class GenesisOrchestrator {
 PROJECT: ${status.project.name || 'Not initialized'}
 PHASE: ${status.phase.current} - ${phaseLabel}
 STATUS: ${status.phase.status}
-AGENT: ${agent} (${status.agents.sync.status})
+
+GATES:
+${gateDisplay}
+
+PROGRESS:
+${progressDisplay}
 
 SESSION:
   Last Active: ${status.session.last_active || 'Never'}
-  Resume Point: ${status.session.resume_point || 'None'}
   Last Action: ${status.session.last_action || 'None'}
-
-GATES:
-${Object.entries(status.gates).map(([k, v]) => `  ${k}: ${v}`).join('\n')}
-
-PROGRESS:
-  Phase 1: ${status.progress.phase_1_requirements_drafted ? '✅' : '⚪'} Requirements
-  Phase 2: ${status.progress.phase_2_components_total > 0 ? '✅' : '⚪'} Design (${status.progress.phase_2_components_designed.length}/${status.progress.phase_2_components_total})
-  Phase 3: ${status.progress.phase_3_tasks_total > 0 ? '✅' : '⚪'} Tasks (${status.progress.phase_3_tasks_created.length}/${status.progress.phase_3_tasks_total})
-  Phase 4: ${status.progress.phase_4_docs_total > 0 ? '✅' : '⚪'} Research (${status.progress.phase_4_docs_completed.length}/${status.progress.phase_4_docs_total})
-  Phase 5: ${status.progress.phase_5_tasks_total > 0 ? '✅' : '⚪'} Implementation (${status.progress.phase_5_tasks_completed.length}/${status.progress.phase_5_tasks_total})
-  Phase 6: ${status.progress.phase_6_tests_total > 0 ? '✅' : '⚪'} Validation (${status.progress.phase_6_tests_passed.length}/${status.progress.phase_6_tests_total})
-  Phase 7: ${status.progress.phase_7_deployment_total > 0 ? '✅' : '⚪'} Deployment
 
 ERRORS: ${status.errors.active.length} active
 HALTED: ${status.halted ? `Yes (${status.halt_code})` : 'No'}
-CHECKPOINT: ${status.checkpoints.pending ? `Pending (${status.checkpoints.type})` : 'None'}
+ITERATIONS: ${status.iteration.count}/${status.iteration.max}
+`;
 
+    if (status.checkpoints.pending) {
+      message += `
+═══════════════════════════════════════════════════════════
+⏳ CHECKPOINT PENDING - Awaiting human approval
+   Type: ${status.checkpoints.type}
+   Context: ${status.checkpoints.context}
+   Validation: ${status.checkpoints.validation_passed ? '✅ Passed' : '⚠️ Not validated'}
+   
+   Respond with:
+   • APPROVE - Proceed to next phase
+   • REJECT "feedback" - Return for revisions
+   • SKIP "reason" - Force advance (logged)
 ═══════════════════════════════════════════════════════════`;
-
-    // Check for stale session
-    if (this.stateManager.isSessionStale()) {
-      message += `\n\n⚠️ WARNING: Session inactive for >${status.session.stale_threshold_hours} hours`;
-    }
-
-    // Check for expired checkpoint
-    if (this.stateManager.isCheckpointExpired()) {
-      message += `\n\n⚠️ WARNING: Checkpoint expired. Run GENESIS: VALIDATE to refresh.`;
     }
 
     return { success: true, message, data: status };
   }
 
-  private async handleInit(name: string): Promise<CommandResult> {
+  // ============================================================================
+  // Initialization - Requires human approval
+  // ============================================================================
+
+  private async handleInit(name: string, description?: string): Promise<CommandResult> {
     const status = this.stateManager.get();
 
-    if (status.phase.current !== 0 || status.project.name !== null) {
-      return { success: false, message: 'Project already initialized. Use GENESIS: ROLLBACK 0 to restart.' };
+    if (status.project.name !== null) {
+      return { 
+        success: false, 
+        message: 'Project already initialized. Use GENESIS: ROLLBACK 1 to restart from requirements.' 
+      };
     }
 
-    // Validate agent prompts if configured
-    if (status.config.validate_prompts_on_init) {
-      const promptValidation = await this.validator.validateAgentPrompts(status);
-      if (!promptValidation.valid) {
-        return {
-          success: false,
-          message: `Agent prompt validation failed:\n${promptValidation.errors.join('\n')}`
-        };
-      }
-    }
+    // Ensure directories exist
+    await this.ensureDirectories();
 
-    // Initialize project
-    await this.stateManager.initialize(name);
-    
-    // Request checkpoint for initialization approval
-    await this.stateManager.requestCheckpoint('PROJECT_INIT', `Initialize project: ${name}`);
+    // Initialize project - this requests a checkpoint
+    await this.stateManager.initialize(name, description);
 
     return {
       success: true,
-      message: `Project "${name}" initialized.\n\nAwaiting approval to begin Phase 1 (Requirements).\nRespond with APPROVE to continue or REJECT <feedback> to cancel.`,
-      checkpoint: { type: 'PROJECT_INIT', awaiting_approval: true }
+      message: `
+═══════════════════════════════════════════════════════════
+              PROJECT INITIALIZED
+═══════════════════════════════════════════════════════════
+
+Project: ${name}
+${description ? `Description: ${description}` : ''}
+
+⏳ AWAITING APPROVAL
+
+Before beginning Phase 1 (Requirements), please confirm:
+• Project name and scope are correct
+• Ready to proceed with requirements gathering
+
+Respond with:
+  APPROVE - Begin Phase 1 (Requirements)
+  REJECT "feedback" - Cancel and revise
+
+═══════════════════════════════════════════════════════════`,
+      awaiting_approval: true
     };
   }
 
+  // ============================================================================
+  // Validation Handler
+  // ============================================================================
+
   private async handleValidate(): Promise<CommandResult> {
     const status = this.stateManager.get();
-    const result = await this.validator.validatePhase(status);
+    
+    if (status.phase.current === 0) {
+      return { success: false, message: 'No phase to validate. Approve initialization first.' };
+    }
 
-    // Evaluate soft gates
-    const softGates = await this.validator.evaluateSoftGates(status);
+    const result = await this.validator.validatePhase(status);
 
     let message = `
 ═══════════════════════════════════════════════════════════
-              VALIDATION RESULTS - Phase ${status.phase.current}
+        VALIDATION - Phase ${status.phase.current}: ${status.phase.labels[status.phase.current]}
 ═══════════════════════════════════════════════════════════
 
-OVERALL: ${result.passed ? '✅ PASSED' : '❌ FAILED'}
+RESULT: ${result.passed ? '✅ PASSED' : '❌ FAILED'}
 
 CRITERIA:
-${result.criteria.map(c => `  ${c.passed ? '✅' : '❌'} [${c.severity.toUpperCase()}] ${c.id}: ${c.description}`).join('\n')}
+${result.criteria.map(c => `  ${c.passed ? '✅' : '❌'} [${c.required ? 'REQUIRED' : 'OPTIONAL'}] ${c.description}`).join('\n')}
 `;
 
-    if (result.hardFailures.length > 0) {
-      message += `\nHARD FAILURES (must fix):\n${result.hardFailures.map(f => `  ❌ ${f}`).join('\n')}`;
+    if (result.failures.length > 0) {
+      message += `
+FAILURES (must fix):
+${result.failures.map(f => `  ❌ ${f}`).join('\n')}
+`;
     }
 
-    if (result.softWarnings.length > 0) {
-      message += `\nSOFT WARNINGS:\n${result.softWarnings.map(w => `  ⚠️ ${w}`).join('\n')}`;
-    }
-
-    if (softGates.warnings.length > 0) {
-      message += `\nSOFT GATE WARNINGS:\n${softGates.warnings.map(w => `  ⚠️ ${w}`).join('\n')}`;
+    if (result.warnings.length > 0) {
+      message += `
+WARNINGS:
+${result.warnings.map(w => `  ⚠️ ${w}`).join('\n')}
+`;
     }
 
     if (result.passed) {
-      message += `\n\n✅ Ready for checkpoint. Run GENESIS: CHECKPOINT to request approval.`;
+      message += `
+═══════════════════════════════════════════════════════════
+✅ Ready for checkpoint. Run GENESIS: CHECKPOINT to request approval.
+═══════════════════════════════════════════════════════════`;
     } else {
-      message += `\n\n❌ Fix hard failures before requesting checkpoint.`;
+      message += `
+═══════════════════════════════════════════════════════════
+❌ Fix failures before requesting checkpoint.
+   Use GENESIS: ITERATE "feedback" to refine.
+═══════════════════════════════════════════════════════════`;
     }
+
+    await this.stateManager.updateSession(`Validated Phase ${status.phase.current}: ${result.passed ? 'PASSED' : 'FAILED'}`);
 
     return { success: result.passed, message, data: result };
   }
 
-  private async handleCheckpoint(partial = false): Promise<CommandResult> {
+  // ============================================================================
+  // Checkpoint Handler - Requests human approval
+  // ============================================================================
+
+  private async handleCheckpoint(): Promise<CommandResult> {
     const status = this.stateManager.get();
+
+    if (status.phase.current === 0) {
+      return { success: false, message: 'Cannot checkpoint Phase 0. Approve initialization first.' };
+    }
+
+    if (status.checkpoints.pending) {
+      return { success: false, message: 'Checkpoint already pending. Respond with APPROVE, REJECT, or SKIP.' };
+    }
 
     // Validate first
     const validation = await this.validator.validatePhase(status);
-    if (!validation.passed && !partial) {
-      return {
-        success: false,
-        message: `Cannot checkpoint: validation failed.\n${validation.hardFailures.join('\n')}\n\nRun GENESIS: VALIDATE to see details.`
-      };
-    }
+    
+    // Request checkpoint (even if validation failed - human decides)
+    await this.stateManager.requestCheckpoint(validation.passed);
 
-    const checkpointType = this.validator.getCheckpointTypeForPhase(status.phase.current);
-    const context = partial 
-      ? `Partial checkpoint for Phase ${status.phase.current}`
-      : `Phase ${status.phase.current} complete`;
-
-    await this.stateManager.requestCheckpoint(checkpointType, context, partial);
-
-    if (partial) {
-      this.stateManager.get().metrics.partial_checkpoints++;
-    }
+    const phaseLabel = status.phase.labels[status.phase.current];
 
     return {
       success: true,
@@ -253,75 +280,196 @@ ${result.criteria.map(c => `  ${c.passed ? '✅' : '❌'} [${c.severity.toUpperC
               CHECKPOINT REQUESTED
 ═══════════════════════════════════════════════════════════
 
-Type: ${checkpointType}
-Partial: ${partial ? 'Yes' : 'No'}
-Phase: ${status.phase.current} - ${status.phase.labels[status.phase.current]}
+Phase: ${status.phase.current} - ${phaseLabel}
+Validation: ${validation.passed ? '✅ PASSED' : '⚠️ FAILED (human override available)'}
 
-Awaiting human approval.
-Respond with:
-  APPROVE - Proceed to next phase
-  REJECT <feedback> - Return for revisions
-  DEFER - Pause for later review
+${!validation.passed ? `Validation Issues:\n${validation.failures.map(f => `  ❌ ${f}`).join('\n')}\n` : ''}
+⏳ AWAITING HUMAN APPROVAL
 
-Checkpoint expires: ${status.checkpoints.expires_at}
+Review the phase artifacts and respond with:
+  APPROVE - Proceed to Phase ${status.phase.current + 1}
+  REJECT "feedback" - Return for revisions
+  SKIP "reason" - Force advance despite issues (logged)
+
 ═══════════════════════════════════════════════════════════`,
-      checkpoint: { type: checkpointType, awaiting_approval: true }
+      awaiting_approval: true
     };
   }
 
-  private async handleAdvance(): Promise<CommandResult> {
+  // ============================================================================
+  // Human Control Handlers - Core of supervised model
+  // ============================================================================
+
+  private async handleApprove(feedback?: string): Promise<CommandResult> {
     const status = this.stateManager.get();
 
-    if (status.checkpoints.pending) {
-      return { success: false, message: 'Cannot advance: checkpoint pending. Await approval first.' };
+    if (!status.checkpoints.pending) {
+      return { success: false, message: 'No pending checkpoint to approve.' };
     }
 
-    if (status.phase.current >= 7) {
-      return { success: false, message: 'Already at final phase (Deployment).' };
+    // Resolve checkpoint
+    await this.stateManager.resolveCheckpoint('APPROVE', feedback);
+
+    // Advance to next phase
+    if (status.phase.current < 7) {
+      const newPhase = await this.stateManager.advancePhase();
+      const newLabel = status.phase.labels[newPhase];
+      const agent = this.stateManager.getAgentForPhase(newPhase);
+
+      return {
+        success: true,
+        message: `
+═══════════════════════════════════════════════════════════
+              ✅ APPROVED - ADVANCING
+═══════════════════════════════════════════════════════════
+
+${feedback ? `Feedback: ${feedback}\n` : ''}
+Previous: Phase ${status.phase.current} - ${status.phase.labels[status.phase.current]} ✅
+Current:  Phase ${newPhase} - ${newLabel}
+Agent:    ${agent || 'None'}
+
+Ready to begin ${newLabel} phase.
+${agent ? `\nUse GENESIS: LOAD_AGENT ${newPhase} to load agent context.` : ''}
+
+═══════════════════════════════════════════════════════════`
+      };
+    } else {
+      // Project complete
+      return {
+        success: true,
+        message: `
+═══════════════════════════════════════════════════════════
+              🎉 PROJECT COMPLETE
+═══════════════════════════════════════════════════════════
+
+All 7 phases completed and approved.
+
+Project: ${status.project.name}
+Total Transitions: ${status.transitions.length}
+Total Iterations: ${status.iteration.count}
+
+Artifacts created:
+  • .spec/requirements.md
+  • .spec/design.md
+  • .spec/tasks.md
+  • docs/*
+  • src/*
+  • .spec/validation.md
+  • .deploy/*
+
+═══════════════════════════════════════════════════════════`
+      };
+    }
+  }
+
+  private async handleReject(feedback: string): Promise<CommandResult> {
+    const status = this.stateManager.get();
+
+    if (!status.checkpoints.pending) {
+      return { success: false, message: 'No pending checkpoint to reject.' };
     }
 
-    // Update gate status
-    const currentGate = `gate_${status.phase.current}_${this.getGateName(status.phase.current)}`;
-    status.gates[currentGate] = 'PASSED';
-
-    const newPhase = await this.stateManager.advancePhase();
-    const newAgent = this.stateManager.getAgentForPhase(newPhase);
-
-    // Activate and sync new agent
-    await this.stateManager.activateAgent(newAgent);
-    const syncResult = await this.stateManager.syncAgent(newAgent);
+    await this.stateManager.resolveCheckpoint('REJECT', feedback);
 
     return {
       success: true,
       message: `
 ═══════════════════════════════════════════════════════════
-              ADVANCED TO PHASE ${newPhase}
+              ❌ REJECTED - REVISIONS NEEDED
 ═══════════════════════════════════════════════════════════
 
-Phase: ${newPhase} - ${status.phase.labels[newPhase]}
-Agent: ${newAgent}
+Phase: ${status.phase.current} - ${status.phase.labels[status.phase.current]}
 
-Agent Context Loaded:
-  - Agent: ${newAgent}
-  - Prompt: ${status.agents.registry[newAgent].prompt}
-  - Identity: ${syncResult.identity}
-  - Status: SYNCED ✓
+Feedback: ${feedback}
 
-Ready to begin ${status.phase.labels[newPhase]} phase.
+Please address the feedback and:
+1. Make necessary changes
+2. Run GENESIS: VALIDATE to check
+3. Run GENESIS: CHECKPOINT when ready
+
+Iterations: ${status.iteration.count}/${status.iteration.max}
+
 ═══════════════════════════════════════════════════════════`
     };
   }
 
-  private getGateName(phase: Phase): string {
-    const names: Record<Phase, string> = {
-      0: 'init', 1: 'requirements', 2: 'design', 3: 'tasks',
-      4: 'research', 5: 'implementation', 6: 'validation', 7: 'deployment'
-    };
-    return names[phase];
+  private async handleSkip(reason: string): Promise<CommandResult> {
+    const status = this.stateManager.get();
+
+    if (!status.checkpoints.pending) {
+      return { success: false, message: 'No pending checkpoint to skip.' };
+    }
+
+    // Record skip with reason (for audit trail)
+    await this.stateManager.resolveCheckpoint('SKIP', reason);
+
+    // Advance despite issues
+    if (status.phase.current < 7) {
+      const newPhase = await this.stateManager.advancePhase();
+      const newLabel = status.phase.labels[newPhase];
+
+      return {
+        success: true,
+        message: `
+═══════════════════════════════════════════════════════════
+              ⚠️ SKIPPED - ADVANCING WITH OVERRIDE
+═══════════════════════════════════════════════════════════
+
+Phase: ${status.phase.current} - ${status.phase.labels[status.phase.current]}
+Skip Reason: ${reason}
+
+⚠️ This skip has been logged in the audit trail.
+
+Now at: Phase ${newPhase} - ${newLabel}
+
+═══════════════════════════════════════════════════════════`
+      };
+    }
+
+    return { success: true, message: 'Skip recorded.' };
   }
+
+  private async handleUndo(): Promise<CommandResult> {
+    const status = this.stateManager.get();
+
+    if (status.phase.current <= 1) {
+      return { success: false, message: 'Cannot undo from Phase 0 or 1. Use ROLLBACK for specific phase.' };
+    }
+
+    if (status.checkpoints.pending) {
+      return { success: false, message: 'Cannot undo with pending checkpoint. Resolve checkpoint first.' };
+    }
+
+    const previousPhase = (status.phase.current - 1) as Phase;
+    await this.stateManager.rollbackPhase(previousPhase);
+
+    return {
+      success: true,
+      message: `
+═══════════════════════════════════════════════════════════
+              ↩️ UNDO - RETURNED TO PREVIOUS PHASE
+═══════════════════════════════════════════════════════════
+
+From: Phase ${status.phase.current} - ${status.phase.labels[status.phase.current]}
+To:   Phase ${previousPhase} - ${status.phase.labels[previousPhase]}
+
+Phase ${previousPhase} is now IN_PROGRESS.
+Make changes and run GENESIS: VALIDATE when ready.
+
+═══════════════════════════════════════════════════════════`
+    };
+  }
+
+  // ============================================================================
+  // Iteration Handler
+  // ============================================================================
 
   private async handleIterate(feedback: string): Promise<CommandResult> {
     const status = this.stateManager.get();
+
+    if (status.checkpoints.pending) {
+      return { success: false, message: 'Cannot iterate with pending checkpoint. Resolve checkpoint first.' };
+    }
 
     try {
       const count = await this.stateManager.applyIteration(feedback);
@@ -334,12 +482,13 @@ Ready to begin ${status.phase.labels[newPhase]} phase.
       return {
         success: true,
         message: `
-Iteration ${count}/${status.iteration.max_iterations} applied.
+Iteration ${count}/${status.iteration.max} applied.
 
 Feedback: ${feedback}
 
-Continue working on Phase ${status.phase.current}.
-${count >= status.iteration.max_iterations - 1 ? '\n⚠️ Approaching max iterations. Consider using REJECT for major changes.' : ''}`
+Continue working on Phase ${status.phase.current} - ${status.phase.labels[status.phase.current]}.
+Run GENESIS: VALIDATE when ready.
+${count >= status.iteration.max - 1 ? '\n⚠️ Approaching max iterations. Consider CHECKPOINT or SKIP.' : ''}`
       };
     } catch (error) {
       return {
@@ -349,6 +498,10 @@ ${count >= status.iteration.max_iterations - 1 ? '\n⚠️ Approaching max itera
     }
   }
 
+  // ============================================================================
+  // System Control Handlers
+  // ============================================================================
+
   private async handleHalt(code: HaltCode, reason: string): Promise<CommandResult> {
     await this.stateManager.halt(code, reason);
 
@@ -356,34 +509,30 @@ ${count >= status.iteration.max_iterations - 1 ? '\n⚠️ Approaching max itera
       success: true,
       message: `
 ═══════════════════════════════════════════════════════════
-                    SYSTEM HALTED
+                    ⛔ SYSTEM HALTED
 ═══════════════════════════════════════════════════════════
 
 Code: ${code}
 Reason: ${reason}
 
-The system has been halted. To resume:
+To resume:
 1. Address the issue described above
-2. Run GENESIS: RESUME with justification
+2. Run: GENESIS: RESUME "justification for resuming"
 
 ═══════════════════════════════════════════════════════════`,
       halt: { code, reason }
     };
   }
 
-  private async handleResume(justification?: string): Promise<CommandResult> {
+  private async handleResume(justification: string): Promise<CommandResult> {
     const status = this.stateManager.get();
 
     if (!status.halted) {
       return { success: false, message: 'System is not halted.' };
     }
 
-    // HALT-003 requires justification
-    if (status.halt_code === 'HALT-003' && !justification) {
-      return {
-        success: false,
-        message: 'HALT-003 requires justification. Run: GENESIS: RESUME "your justification"'
-      };
+    if (!justification) {
+      return { success: false, message: 'Justification required. Run: GENESIS: RESUME "your justification"' };
     }
 
     await this.stateManager.resume(justification);
@@ -392,310 +541,270 @@ The system has been halted. To resume:
       success: true,
       message: `
 ═══════════════════════════════════════════════════════════
-                    SYSTEM RESUMED
+                    ✅ SYSTEM RESUMED
 ═══════════════════════════════════════════════════════════
 
 Previous halt: ${status.halt_code}
-${justification ? `Justification: ${justification}` : ''}
+Justification: ${justification}
 
-Continuing from Phase ${status.phase.current}.
+Continuing from Phase ${status.phase.current} - ${status.phase.labels[status.phase.current]}.
 Run GENESIS: STATUS to see current state.
+
 ═══════════════════════════════════════════════════════════`
     };
   }
 
-  private async handleRollback(targetPhase: Phase, dryRun = false): Promise<CommandResult> {
+  private async handleRollback(targetPhase: Phase): Promise<CommandResult> {
     const status = this.stateManager.get();
 
     if (targetPhase >= status.phase.current) {
-      return { success: false, message: `Cannot rollback forward. Current phase: ${status.phase.current}` };
+      return { success: false, message: `Cannot rollback forward. Current: ${status.phase.current}` };
     }
 
     if (targetPhase < 1) {
-      return { success: false, message: 'Cannot rollback to Phase 0. Use GENESIS: INIT to restart.' };
+      return { success: false, message: 'Cannot rollback to Phase 0. Minimum is Phase 1.' };
     }
 
     if (status.checkpoints.pending) {
       return { success: false, message: 'Cannot rollback with pending checkpoint. Resolve checkpoint first.' };
     }
 
-    const impact = await this.rollbackManager.calculateImpact(status.phase.current, targetPhase);
-
-    if (dryRun) {
-      return {
-        success: true,
-        message: `
-═══════════════════════════════════════════════════════════
-              DRY-RUN: ROLLBACK TO PHASE ${targetPhase}
-═══════════════════════════════════════════════════════════
-
-From: Phase ${status.phase.current} → Phase ${targetPhase}
-
-Files to archive (${impact.files.length} files):
-${impact.files.map(f => `  - ${f}`).join('\n')}
-
-Progress to reset:
-${impact.progressReset.map(p => `  - ${p}`).join('\n')}
-
-State changes:
-  - phase.current: ${status.phase.current} → ${targetPhase}
-  - Gates ${targetPhase + 1}-7: PASSED → LOCKED
-
-Archive location: ${impact.archivePath}
-
-NO CHANGES MADE. Run without --dry-run to execute.
-═══════════════════════════════════════════════════════════`
-      };
-    }
-
-    // Execute rollback
-    await this.rollbackManager.execute(status.phase.current, targetPhase);
+    await this.stateManager.rollbackPhase(targetPhase);
 
     return {
       success: true,
       message: `
 ═══════════════════════════════════════════════════════════
-              ROLLBACK COMPLETE
+              ↩️ ROLLBACK COMPLETE
 ═══════════════════════════════════════════════════════════
 
-Rolled back from Phase ${status.phase.current} to Phase ${targetPhase}
+From: Phase ${status.phase.current} - ${status.phase.labels[status.phase.current]}
+To:   Phase ${targetPhase} - ${status.phase.labels[targetPhase]}
 
-Archived: ${impact.files.length} files
-Location: ${impact.archivePath}
-
-Current Phase: ${targetPhase} - ${status.phase.labels[targetPhase]}
-Active Agent: ${this.stateManager.getAgentForPhase(targetPhase)}
+All progress after Phase ${targetPhase} has been reset.
+Phase ${targetPhase} is now IN_PROGRESS.
 
 Run GENESIS: STATUS to see current state.
+
 ═══════════════════════════════════════════════════════════`
     };
   }
 
-  private async handleAgent(name: AgentName): Promise<CommandResult> {
-    const status = this.stateManager.get();
+  // ============================================================================
+  // Agent Context Loading
+  // ============================================================================
 
-    if (!status.agents.registry[name]) {
-      return { success: false, message: `Unknown agent: ${name}` };
+  private async handleLoadAgent(phase: Phase): Promise<CommandResult> {
+    const context = await this.stateManager.loadAgentContext(phase);
+
+    if (!context) {
+      return { success: false, message: `No agent defined for Phase ${phase}.` };
     }
 
-    await this.stateManager.activateAgent(name);
-    const syncResult = await this.stateManager.syncAgent(name);
-
-    return {
-      success: true,
-      message: `
-Agent Context Loaded:
-  - Agent: ${name}
-  - Prompt: ${status.agents.registry[name].prompt}
-  - Identity: ${syncResult.identity}
-  - Phase: ${status.agents.registry[name].phase}
-  - Status: SYNCED ✓`
-    };
-  }
-
-  private async handleChunk(number: number): Promise<CommandResult> {
-    const status = this.stateManager.get();
-
-    if (!status.context.chunking_enabled) {
-      return { success: false, message: 'Chunking not enabled for current artifact.' };
-    }
-
-    if (number < 1 || (status.context.total_chunks && number > status.context.total_chunks)) {
-      return { success: false, message: `Invalid chunk number. Valid range: 1-${status.context.total_chunks}` };
-    }
-
-    status.context.current_chunk = number;
-    await this.stateManager.save();
-
-    return {
-      success: true,
-      message: `Processing chunk ${number}/${status.context.total_chunks}`
-    };
-  }
-
-  private async handleCacheClear(library?: string): Promise<CommandResult> {
-    const status = this.stateManager.get();
-    const cachePath = path.join(this.workspacePath, status.research_cache.cache_path);
-
+    // Read the prompt file to provide context
+    const promptPath = path.join(this.workspacePath, context.prompt_path);
+    
     try {
-      if (library) {
-        const libPath = path.join(cachePath, library);
-        await fs.rm(libPath, { recursive: true, force: true });
-        return { success: true, message: `Cleared cache for library: ${library}` };
-      } else {
-        // Clear all except _index.json
-        const entries = await fs.readdir(cachePath);
-        for (const entry of entries) {
-          if (entry !== '_index.json') {
-            await fs.rm(path.join(cachePath, entry), { recursive: true, force: true });
-          }
-        }
-        return { success: true, message: 'Cleared all cache entries' };
-      }
-    } catch (error) {
-      return { success: false, message: `Cache clear failed: ${error}` };
-    }
-  }
-
-  private async handleCacheStatus(): Promise<CommandResult> {
-    const status = this.stateManager.get();
-    const indexPath = path.join(this.workspacePath, status.research_cache.cache_path, '_index.json');
-
-    try {
-      const indexContent = await fs.readFile(indexPath, 'utf-8');
-      const index = JSON.parse(indexContent);
+      const content = await fs.readFile(promptPath, 'utf-8');
+      const budgetStatus = this.stateManager.getContextBudgetStatus();
 
       return {
         success: true,
         message: `
 ═══════════════════════════════════════════════════════════
-              RESEARCH CACHE STATUS
+              AGENT CONTEXT LOADED
 ═══════════════════════════════════════════════════════════
 
-Enabled: ${status.research_cache.enabled}
-TTL: ${status.research_cache.ttl_hours} hours
-Path: ${status.research_cache.cache_path}
+Agent: ${context.name}
+Phase: ${context.phase} - ${this.stateManager.get().phase.labels[context.phase]}
+Prompt: ${context.prompt_path}
+Lines: ${context.prompt_lines}
 
-Statistics:
-  Total Entries: ${index.statistics.total_entries}
-  Valid: ${index.statistics.valid_entries}
-  Expired: ${index.statistics.expired_entries}
-  Size: ${Math.round(index.statistics.total_size_bytes / 1024)} KB
-  Hit Rate: ${index.statistics.cache_hits}/${index.statistics.cache_hits + index.statistics.cache_misses} hits
+CONTEXT BUDGET:
+  Used: ${budgetStatus.used} / ${budgetStatus.budget} lines
+  Remaining: ${budgetStatus.remaining} lines
+  ${budgetStatus.overBudget ? '⚠️ OVER BUDGET' : '✅ Within budget'}
 
-Integrity: ${status.research_cache.integrity.status}
-Last Verified: ${status.research_cache.integrity.last_verified || 'Never'}
-═══════════════════════════════════════════════════════════`,
-        data: index
+--- Agent Prompt ---
+${content}
+═══════════════════════════════════════════════════════════`
       };
     } catch {
-      return { success: true, message: 'Cache is empty or not initialized.' };
+      return {
+        success: true,
+        message: `Agent ${context.name} loaded for Phase ${phase}. Prompt file: ${context.prompt_path}`
+      };
     }
   }
 
-  private async handleMetrics(): Promise<CommandResult> {
-    const dashboard = await this.metrics.generateDashboard();
-    return { success: true, message: dashboard };
+  private async handleLoadArtifact(artifactPath: string): Promise<CommandResult> {
+    const result = await this.stateManager.loadArtifact(artifactPath);
+
+    if (!result) {
+      return { success: false, message: `Artifact not found: ${artifactPath}` };
+    }
+
+    const budgetStatus = this.stateManager.getContextBudgetStatus();
+
+    return {
+      success: true,
+      message: `
+═══════════════════════════════════════════════════════════
+              ARTIFACT LOADED
+═══════════════════════════════════════════════════════════
+
+Path: ${artifactPath}
+Lines: ${result.lines}
+
+CONTEXT BUDGET:
+  Used: ${budgetStatus.used} / ${budgetStatus.budget} lines
+  Remaining: ${budgetStatus.remaining} lines
+  ${budgetStatus.overBudget ? '⚠️ OVER BUDGET - Consider resetting context' : '✅ Within budget'}
+
+--- Content ---
+${result.content}
+═══════════════════════════════════════════════════════════`
+    };
   }
 
-  private async handleMetricsExport(format: 'json' | 'csv' | 'md'): Promise<CommandResult> {
-    const exportPath = await this.metrics.export(format);
-    return { success: true, message: `Metrics exported to: ${exportPath}` };
-  }
-
-  private async handleSoftGates(): Promise<CommandResult> {
+  private async handleContextStatus(): Promise<CommandResult> {
     const status = this.stateManager.get();
-    const softGates = await this.validator.evaluateSoftGates(status);
+    const budgetStatus = this.stateManager.getContextBudgetStatus();
 
-    let message = `
+    const artifactsList = status.agent?.artifacts_loaded.length 
+      ? status.agent.artifacts_loaded.map(a => `  - ${a}`).join('\n')
+      : '  (none)';
+
+    return {
+      success: true,
+      message: `
 ═══════════════════════════════════════════════════════════
-              SOFT GATE STATUS
+              CONTEXT STATUS
 ═══════════════════════════════════════════════════════════
 
-Policy: ${status.soft_gates.policy}
-Enabled: ${status.soft_gates.enabled}
+AGENT: ${status.agent?.name || 'None loaded'}
+PROMPT: ${status.agent?.prompt_path || 'N/A'}
 
-Current Violations (${status.soft_gates.violations.length}):
-${status.soft_gates.violations.length === 0 ? '  None' : status.soft_gates.violations.map(v => 
-  `  ⚠️ ${v.rule}: ${v.actual}% (threshold: ${v.threshold}%) - ${v.acknowledged ? 'Acknowledged' : 'Pending'}`
-).join('\n')}
+CONTEXT BUDGET:
+  Prompt Lines: ${status.context.prompt_lines}
+  Artifact Lines: ${status.context.artifacts_lines}
+  Total Used: ${budgetStatus.used} / ${budgetStatus.budget} lines
+  Remaining: ${budgetStatus.remaining} lines
+  Status: ${budgetStatus.overBudget ? '⚠️ OVER BUDGET' : '✅ Within budget'}
 
-Active Warnings:
-${softGates.warnings.length === 0 ? '  None' : softGates.warnings.map(w => `  ⚠️ ${w}`).join('\n')}
+LOADED ARTIFACTS:
+${artifactsList}
 
-Rules:
-${Object.entries(status.soft_gates.rules).map(([rule, config]) => 
-  `  ${rule}: ${config.severity} (threshold: ${config.threshold})`
-).join('\n')}
-═══════════════════════════════════════════════════════════`;
+Use GENESIS: RESET_CONTEXT to clear and start fresh.
+═══════════════════════════════════════════════════════════`
+    };
+  }
 
-    return { success: true, message };
+  private async handleResetContext(): Promise<CommandResult> {
+    await this.stateManager.resetContext();
+
+    return {
+      success: true,
+      message: `
+Context reset. All loaded artifacts cleared.
+Use GENESIS: LOAD_AGENT <phase> to load agent context.`
+    };
   }
 
   // ============================================================================
-  // Approval Handlers
+  // Human Control Enhancement - Force and Override
   // ============================================================================
 
-  private async handleApprove(feedback?: string): Promise<CommandResult> {
-    const status = this.stateManager.get();
-
-    if (!status.checkpoints.pending) {
-      return { success: false, message: 'No pending checkpoint to approve.' };
-    }
-
-    const checkpointType = status.checkpoints.type!;
-    await this.stateManager.resolveCheckpoint('APPROVE', feedback);
-
-    // If not partial, advance to next phase
-    if (!status.checkpoints.partial && status.phase.current < 7) {
-      return this.handleAdvance();
-    }
+  private async handleForce(action: string, reason: string): Promise<CommandResult> {
+    await this.stateManager.logAudit(`FORCE: ${action}`, reason);
 
     return {
       success: true,
       message: `
-✅ Checkpoint APPROVED: ${checkpointType}
-${feedback ? `Feedback: ${feedback}` : ''}
+═══════════════════════════════════════════════════════════
+              ⚠️ FORCE ACTION LOGGED
+═══════════════════════════════════════════════════════════
 
-${status.checkpoints.partial ? 'Continuing with remaining work...' : 'Ready to advance. Run GENESIS: ADVANCE to proceed.'}`
+Action: ${action}
+Reason: ${reason}
+Timestamp: ${new Date().toISOString()}
+
+This action has been logged in the audit trail.
+Proceed with the forced action manually.
+
+═══════════════════════════════════════════════════════════`
     };
   }
 
-  private async handleReject(feedback: string): Promise<CommandResult> {
+  private async handleOverride(gate: string, reason: string): Promise<CommandResult> {
     const status = this.stateManager.get();
 
-    if (!status.checkpoints.pending) {
-      return { success: false, message: 'No pending checkpoint to reject.' };
+    if (!status.gates[gate]) {
+      const validGates = Object.keys(status.gates).join(', ');
+      return { 
+        success: false, 
+        message: `Unknown gate: ${gate}\nValid gates: ${validGates}` 
+      };
     }
 
-    const checkpointType = status.checkpoints.type!;
-    await this.stateManager.resolveCheckpoint('REJECT', feedback);
+    await this.stateManager.overrideGate(gate, reason);
 
     return {
       success: true,
       message: `
-❌ Checkpoint REJECTED: ${checkpointType}
+═══════════════════════════════════════════════════════════
+              ⚠️ GATE OVERRIDE
+═══════════════════════════════════════════════════════════
 
-Feedback: ${feedback}
+Gate: ${gate}
+Previous Status: ${status.gates[gate]}
+New Status: PASSED
+Reason: ${reason}
 
-Please address the feedback and run GENESIS: VALIDATE when ready.`
+This override has been logged in the audit trail.
+
+═══════════════════════════════════════════════════════════`
     };
   }
 
-  private async handleDefer(): Promise<CommandResult> {
+  private async handleHistory(): Promise<CommandResult> {
     const status = this.stateManager.get();
 
-    if (!status.checkpoints.pending) {
-      return { success: false, message: 'No pending checkpoint to defer.' };
-    }
+    const checkpointHistory = status.checkpoints.history.length > 0
+      ? status.checkpoints.history.map(h => 
+          `  ${h.resolved_at} | Phase ${h.phase} | ${h.response}${h.feedback ? ` | "${h.feedback}"` : ''}`
+        ).join('\n')
+      : '  (none)';
 
-    await this.stateManager.resolveCheckpoint('DEFER');
+    const transitionHistory = status.transitions.length > 0
+      ? status.transitions.map(t => 
+          `  ${t.timestamp} | Phase ${t.from_phase} → ${t.to_phase} | ${t.trigger}${t.reason ? ` | "${t.reason}"` : ''}`
+        ).join('\n')
+      : '  (none)';
 
-    return {
-      success: true,
-      message: `
-⏸️ Checkpoint DEFERRED
-
-The checkpoint remains pending for later review.
-Expires: ${status.checkpoints.expires_at}
-
-Resume review when ready.`
-    };
-  }
-
-  private async handleAbort(): Promise<CommandResult> {
-    await this.stateManager.halt('HALT-007', 'User aborted via ABORT command');
+    const auditHistory = status.audit.length > 0
+      ? status.audit.map(a => 
+          `  ${a.timestamp} | Phase ${a.phase} | ${a.action} | "${a.reason}"`
+        ).join('\n')
+      : '  (none)';
 
     return {
       success: true,
       message: `
-🛑 PROJECT ABORTED
+═══════════════════════════════════════════════════════════
+              AUDIT HISTORY
+═══════════════════════════════════════════════════════════
 
-The system has been halted. To restart:
-1. Run GENESIS: ROLLBACK 1 to return to requirements
-2. Or GENESIS: INIT "new name" to start fresh
+CHECKPOINT HISTORY (${status.checkpoints.history.length}):
+${checkpointHistory}
 
-Use GENESIS: RESUME to continue from current state.`
+PHASE TRANSITIONS (${status.transitions.length}):
+${transitionHistory}
+
+AUDIT LOG (${status.audit.length}):
+${auditHistory}
+
+═══════════════════════════════════════════════════════════`
     };
   }
 
@@ -706,11 +815,9 @@ Use GENESIS: RESUME to continue from current state.`
   async ensureDirectories(): Promise<void> {
     const dirs = [
       '.genesis',
-      '.genesis/archive',
       '.genesis/prompts',
       '.spec',
       'docs',
-      'docs/_cache',
       'src',
       '.deploy'
     ];

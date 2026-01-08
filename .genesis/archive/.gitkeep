@@ -1,3 +1,0 @@
-# Archive directory for rollback artifacts
-# Rollback operations store previous phase artifacts here
-# Format: .genesis/archive/[timestamp]/[phase_artifacts]
