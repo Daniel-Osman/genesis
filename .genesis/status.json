@@ -1,8 +1,8 @@
 {
   "project": {
-    "name": "",
-    "created": "",
-    "updated": ""
+    "name": null,
+    "created": null,
+    "updated": null
   },
   "phase": {
     "current": 0,
@@ -10,7 +10,7 @@
   },
   "checkpoint": {
     "pending": false,
-    "requested_at": "",
+    "requested_at": null,
     "validation_passed": false
   },
   "halted": false,
@@ -19,15 +19,22 @@
   "history": [],
   "errors": {
     "active": [],
-    "resolved": []
+    "resolved": [],
+    "counter": 0
   },
   "artifacts": {
-    "requirements": { "version": 0, "updated": "", "status": "current" },
-    "design": { "version": 0, "updated": "", "status": "current" },
-    "tasks": { "version": 0, "updated": "", "status": "current" },
-    "docs": { "version": 0, "updated": "", "status": "current" },
-    "src": { "version": 0, "updated": "", "status": "current" },
-    "validation": { "version": 0, "updated": "", "status": "current" }
+    "requirements": { "version": 0, "updated": null, "status": "current", "path": ".spec/requirements.md" },
+    "design": { "version": 0, "updated": null, "status": "current", "path": ".spec/design.md" },
+    "tasks": { "version": 0, "updated": null, "status": "current", "path": ".spec/tasks.md" },
+    "docs": { "version": 0, "updated": null, "status": "current", "path": "docs/" },
+    "src": { "version": 0, "updated": null, "status": "current", "path": "src/" },
+    "validation": { "version": 0, "updated": null, "status": "current", "path": ".spec/validation.md" },
+    "deploy": { "version": 0, "updated": null, "status": "current", "path": ".deploy/" }
   },
-  "change_request": null
+  "change_request": null,
+  "meta": {
+    "framework_version": "1.0.0",
+    "timestamp_format": "ISO 8601 (YYYY-MM-DDTHH:mm:ss.sssZ)",
+    "last_session": null
+  }
 }
