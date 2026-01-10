@@ -1,0 +1,6 @@
+# Deployment artifacts directory
+# Files created here during Phase 7 (Deployer)
+# - Dockerfile
+# - docker-compose.yml
+# - .env.example
+# - README.md

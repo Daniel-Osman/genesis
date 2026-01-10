@@ -1,0 +1,33 @@
+{
+  "project": {
+    "name": "",
+    "created": "",
+    "updated": ""
+  },
+  "phase": {
+    "current": 0,
+    "status": "NOT_INITIALIZED"
+  },
+  "checkpoint": {
+    "pending": false,
+    "requested_at": "",
+    "validation_passed": false
+  },
+  "halted": false,
+  "halt_reason": null,
+  "halt_code": null,
+  "history": [],
+  "errors": {
+    "active": [],
+    "resolved": []
+  },
+  "artifacts": {
+    "requirements": { "version": 0, "updated": "", "status": "current" },
+    "design": { "version": 0, "updated": "", "status": "current" },
+    "tasks": { "version": 0, "updated": "", "status": "current" },
+    "docs": { "version": 0, "updated": "", "status": "current" },
+    "src": { "version": 0, "updated": "", "status": "current" },
+    "validation": { "version": 0, "updated": "", "status": "current" }
+  },
+  "change_request": null
+}
